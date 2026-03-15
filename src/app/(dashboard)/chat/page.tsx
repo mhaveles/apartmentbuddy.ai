@@ -37,13 +37,21 @@ export default function ChatPage() {
         body: JSON.stringify({ message: input, conversationId }),
       })
       const data = await res.json()
-      setMessages(prev => [...prev, data.message])
-      setConversationId(data.conversationId)
-      if (data.preferencesExtracted) setPreferencesExtracted(true)
-    } catch {
+      if (!res.ok) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `Error: ${data.error || res.statusText}`,
+          timestamp: new Date().toISOString(),
+        }])
+      } else {
+        setMessages(prev => [...prev, data.message])
+        setConversationId(data.conversationId)
+        if (data.preferencesExtracted) setPreferencesExtracted(true)
+      }
+    } catch (err) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Sorry, something went wrong. Please try again.',
+        content: `Error: ${err instanceof Error ? err.message : 'Unknown error'}`,
         timestamp: new Date().toISOString(),
       }])
     } finally {
@@ -98,7 +106,7 @@ export default function ChatPage() {
           onChange={e => setInput(e.target.value)}
           placeholder="Type your message…"
           disabled={loading}
-          className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+          className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
         />
         <button
           type="submit"

@@ -18,7 +18,7 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
     const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: name } },
@@ -26,8 +26,12 @@ export default function SignupPage() {
     if (error) {
       setError(error.message)
       setLoading(false)
-    } else {
+    } else if (data.session) {
+      // Email confirmation disabled — logged in immediately
       router.push('/chat')
+    } else {
+      // Email confirmation required
+      router.push('/login?confirm=1')
     }
   }
 

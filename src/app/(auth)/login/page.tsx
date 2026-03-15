@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const needsConfirm = searchParams.get('confirm') === '1'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -31,7 +33,10 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 w-full max-w-md p-8">
         <Link href="/" className="text-xl font-bold text-indigo-600 block mb-8">ApartmentBuddy.ai</Link>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h1>
-        <p className="text-gray-500 text-sm mb-8">Sign in to see your apartment matches.</p>
+        {needsConfirm
+          ? <p className="text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-lg px-3 py-2 mb-8">Check your email for a confirmation link, then sign in.</p>
+          : <p className="text-gray-500 text-sm mb-8">Sign in to see your apartment matches.</p>
+        }
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
