@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { anthropic, SCORING_PROMPT } from '@/lib/anthropic'
-import { scrapeZillow, scrapeApartmentsCom } from '@/lib/apify'
+import { scrapeZillow, scrapeApartmentsCom, scrapeCraigslist } from '@/lib/apify'
 import { FREE_SEARCH_LIMIT } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
@@ -82,8 +82,8 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
   }
 
-  // Run scraping (this will take time — in production use a queue)
-  runSearchInBackground(user.id, neighborhoods, preferences, searchRun!.id).catch(console.error)
+  // Use after() so Vercel keeps the function alive until scraping completes
+  after(() => runSearchInBackground(user.id, neighborhoods, preferences, searchRun!.id).catch(console.error))
 
   return NextResponse.json({ searchRunId: searchRun!.id, status: 'running' })
 }
@@ -100,12 +100,13 @@ async function runSearchInBackground(
 
   try {
     // Scrape listings
-    const [zillowListings, apartmentsListings] = await Promise.all([
+    const [zillowListings, apartmentsListings, craigslistListings] = await Promise.all([
       scrapeZillow(neighborhoods),
       scrapeApartmentsCom(neighborhoods),
+      scrapeCraigslist(neighborhoods),
     ])
 
-    const allListings = [...zillowListings, ...apartmentsListings]
+    const allListings = [...zillowListings, ...apartmentsListings, ...craigslistListings]
 
     await supabase
       .from('search_runs')

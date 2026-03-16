@@ -66,6 +66,49 @@ export async function scrapeZillow(
   }
 }
 
+export async function scrapeCraigslist(
+  neighborhoods: Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
+): Promise<ScrapedListing[]> {
+  // Build Craigslist search URLs per neighborhood
+  const searchUrls = neighborhoods.map(n => {
+    const citySlug = n.city.toLowerCase().replace(/\s+/g, '')
+    const query = encodeURIComponent(n.zip_code || `${n.neighborhood} ${n.city}`)
+    return `https://${citySlug}.craigslist.org/search/apa?query=${query}&section=apa`
+  })
+
+  try {
+    const run = await client.actor('dtrungtin/craigslist-scraper').call({
+      startUrls: searchUrls.map(url => ({ url })),
+      maxItems: 50,
+    })
+
+    const { items } = await client.dataset(run.defaultDatasetId).listItems()
+
+    return items.map((item: Record<string, unknown>) => ({
+      externalId: String(item.id || item.postId || Math.random()),
+      source: 'craigslist',
+      url: String(item.url || ''),
+      title: String(item.title || ''),
+      address: String(item.location || item.address || ''),
+      city: String(item.city || neighborhoods[0]?.city || ''),
+      state: String(item.state || neighborhoods[0]?.state || ''),
+      neighborhood: item.neighborhood ? String(item.neighborhood) : null,
+      zipCode: item.zipCode ? String(item.zipCode) : null,
+      rent: Math.round((Number(item.price) || 0) * 100),
+      bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
+      bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
+      sqft: item.sqft ? Number(item.sqft) : null,
+      availableDate: item.availableDate ? String(item.availableDate) : null,
+      amenities: [],
+      description: item.description ? String(item.description) : null,
+      images: Array.isArray(item.images) ? item.images.map(String) : [],
+    }))
+  } catch (error) {
+    console.error('Craigslist scrape error:', error)
+    return []
+  }
+}
+
 export async function scrapeApartmentsCom(
   neighborhoods: Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
 ): Promise<ScrapedListing[]> {

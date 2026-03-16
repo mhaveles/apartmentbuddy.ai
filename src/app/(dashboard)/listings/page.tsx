@@ -20,6 +20,21 @@ export default function ListingsPage() {
 
   useEffect(() => { loadListings() }, [loadListings])
 
+  // On load, check if there's already a running search and resume polling
+  useEffect(() => {
+    async function checkRunning() {
+      const res = await fetch('/api/search')
+      const runs = await res.json()
+      const running = Array.isArray(runs) ? runs.find((r: { status: string; id: string }) => r.status === 'running') : null
+      if (running) {
+        setSearching(true)
+        setSearchStatus('running')
+        setSearchRunId(running.id)
+      }
+    }
+    checkRunning()
+  }, [])
+
   // Poll search run status
   useEffect(() => {
     if (!searchRunId) return
