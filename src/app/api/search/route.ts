@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Use after() so Vercel keeps the function alive until scraping completes
-  after(() => runSearchInBackground(user.id, neighborhoods, preferences, searchRun!.id).catch(console.error))
+  after(() => runSearchInBackground(user.id, neighborhoods, preferences, searchRun!.id, profile.plan === 'free').catch(console.error))
 
   return NextResponse.json({ searchRunId: searchRun!.id, status: 'running' })
 }
@@ -92,7 +92,8 @@ async function runSearchInBackground(
   userId: string,
   neighborhoods: Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>,
   preferences: Record<string, unknown>,
-  searchRunId: string
+  searchRunId: string,
+  isFreeUser: boolean
 ) {
   // Use service role for background work
   const { createServiceClient } = await import('@/lib/supabase/server')
@@ -211,6 +212,11 @@ async function runSearchInBackground(
         completed_at: new Date().toISOString(),
       })
       .eq('id', searchRunId)
+
+    // Refund the search credit if the run failed
+    if (isFreeUser) {
+      await supabase.rpc('decrement_searches_used', { user_id: userId })
+    }
   }
 }
 

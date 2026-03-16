@@ -165,3 +165,13 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Function to refund a search credit on failed runs
+create or replace function public.decrement_searches_used(user_id uuid)
+returns void as $$
+begin
+  update public.profiles
+  set searches_used = greatest(0, searches_used - 1)
+  where id = user_id;
+end;
+$$ language plpgsql security definer;
