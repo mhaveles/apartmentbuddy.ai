@@ -77,7 +77,7 @@ export async function scrapeCraigslist(
   })
 
   try {
-    const run = await client.actor('dtrungtin/craigslist-scraper').call({
+    const run = await client.actor('automation-lab/craigslist-scraper').call({
       startUrls: searchUrls.map(url => ({ url })),
       maxItems: 50,
     })
@@ -109,6 +109,47 @@ export async function scrapeCraigslist(
   }
 }
 
+export async function scrapeTrulia(
+  neighborhoods: Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
+): Promise<ScrapedListing[]> {
+  const searchUrls = neighborhoods.map(n => {
+    const location = n.zip_code || `${n.neighborhood.toLowerCase().replace(/\s+/g, '-')}-${n.city.toLowerCase()}-${n.state.toLowerCase()}`
+    return `https://www.trulia.com/for_rent/${location}/`
+  })
+
+  try {
+    const run = await client.actor('epctex/trulia-scraper').call({
+      startUrls: searchUrls.map(url => ({ url })),
+      maxItems: 50,
+    })
+
+    const { items } = await client.dataset(run.defaultDatasetId).listItems()
+
+    return items.map((item: Record<string, unknown>) => ({
+      externalId: String(item.id || item.propertyId || Math.random()),
+      source: 'trulia',
+      url: String(item.url || ''),
+      title: String(item.title || item.name || ''),
+      address: String(item.address || item.streetAddress || ''),
+      city: String(item.city || ''),
+      state: String(item.state || ''),
+      neighborhood: item.neighborhood ? String(item.neighborhood) : null,
+      zipCode: item.zipCode ? String(item.zipCode) : null,
+      rent: Math.round((Number(item.price) || 0) * 100),
+      bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
+      bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
+      sqft: item.sqft ? Number(item.sqft) : null,
+      availableDate: item.availableDate ? String(item.availableDate) : null,
+      amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
+      description: item.description ? String(item.description) : null,
+      images: Array.isArray(item.photos) ? item.photos.map(String) : [],
+    }))
+  } catch (error) {
+    console.error('Trulia scrape error:', error)
+    return []
+  }
+}
+
 export async function scrapeApartmentsCom(
   neighborhoods: Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
 ): Promise<ScrapedListing[]> {
@@ -118,7 +159,7 @@ export async function scrapeApartmentsCom(
   })
 
   try {
-    const run = await client.actor('novi/apartments-scraper').call({
+    const run = await client.actor('parseforge/apartments-com-scraper').call({
       startUrls: searchUrls.map(url => ({ url })),
       maxItems: 50,
     })

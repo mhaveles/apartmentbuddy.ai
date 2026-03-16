@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { anthropic, SCORING_PROMPT } from '@/lib/anthropic'
-import { scrapeZillow, scrapeApartmentsCom, scrapeCraigslist } from '@/lib/apify'
+import { scrapeZillow, scrapeApartmentsCom, scrapeCraigslist, scrapeTrulia } from '@/lib/apify'
 import { FREE_SEARCH_LIMIT } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
@@ -100,13 +100,14 @@ async function runSearchInBackground(
 
   try {
     // Scrape listings
-    const [zillowListings, apartmentsListings, craigslistListings] = await Promise.all([
+    const [zillowListings, apartmentsListings, craigslistListings, truliaListings] = await Promise.all([
       scrapeZillow(neighborhoods),
       scrapeApartmentsCom(neighborhoods),
       scrapeCraigslist(neighborhoods),
+      scrapeTrulia(neighborhoods),
     ])
 
-    const allListings = [...zillowListings, ...apartmentsListings, ...craigslistListings]
+    const allListings = [...zillowListings, ...apartmentsListings, ...craigslistListings, ...truliaListings]
 
     await supabase
       .from('search_runs')
