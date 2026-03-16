@@ -58,7 +58,7 @@ export default function NeighborhoodsPage() {
               onChange={e => setForm(p => ({ ...p, neighborhood: e.target.value }))}
               placeholder="e.g. Williamsburg"
               required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
@@ -68,7 +68,7 @@ export default function NeighborhoodsPage() {
               onChange={e => setForm(p => ({ ...p, city: e.target.value }))}
               placeholder="e.g. Brooklyn"
               required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
@@ -79,7 +79,7 @@ export default function NeighborhoodsPage() {
               placeholder="e.g. NY"
               required
               maxLength={2}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
@@ -88,7 +88,7 @@ export default function NeighborhoodsPage() {
               value={form.zip_code}
               onChange={e => setForm(p => ({ ...p, zip_code: e.target.value }))}
               placeholder="e.g. 11211"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           {error && <p className="col-span-2 text-red-500 text-sm">{error}</p>}
