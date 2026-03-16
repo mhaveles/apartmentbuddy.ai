@@ -19,7 +19,6 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-grow textarea
   useEffect(() => {
     const ta = textareaRef.current
     if (!ta) return
@@ -27,12 +26,10 @@ export default function ChatPage() {
     ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'
   }, [input])
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Restore previous conversation on load
   useEffect(() => {
     async function restore() {
       try {
@@ -50,6 +47,13 @@ export default function ChatPage() {
     }
     restore()
   }, [])
+
+  function startFresh() {
+    setMessages([INITIAL_MESSAGE])
+    setConversationId(null)
+    setPreferencesExtracted(false)
+    setInput('')
+  }
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return
@@ -111,14 +115,25 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">My Preferences</h1>
-        <p className="text-gray-500 text-sm">Chat with AI to set your apartment criteria.</p>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Preferences</h1>
+          <p className="text-gray-500 text-sm">Chat with AI to set your apartment criteria.</p>
+        </div>
+        {conversationId && (
+          <button
+            onClick={startFresh}
+            className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5"
+          >
+            Start fresh
+          </button>
+        )}
       </div>
 
       {preferencesExtracted && (
-        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 mb-4 flex items-center gap-2">
-          <span>✓</span> Preferences saved! Head to <a href="/neighborhoods" className="font-medium underline">Neighborhoods</a> to start monitoring.
+        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 mb-4 flex items-center justify-between">
+          <span><span className="mr-1">✓</span> Preferences saved! Head to <a href="/neighborhoods" className="font-medium underline">Neighborhoods</a> to start monitoring.</span>
+          <button onClick={startFresh} className="text-xs text-green-600 hover:text-green-800 underline ml-4 shrink-0">Update preferences</button>
         </div>
       )}
 
