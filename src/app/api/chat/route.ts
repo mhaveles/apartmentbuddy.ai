@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     if (jsonMatch) {
       try {
         const prefs = JSON.parse(jsonMatch[1])
-        await supabase
+        const { error: upsertError } = await supabase
           .from('preferences')
           .upsert({
             user_id: user.id,
@@ -78,14 +78,14 @@ export async function POST(req: NextRequest) {
             min_bedrooms: prefs.min_bedrooms || null,
             max_bedrooms: prefs.max_bedrooms || null,
             min_bathrooms: prefs.min_bathrooms || null,
-            pet_friendly: prefs.pet_friendly || null,
-            parking_required: prefs.parking_required || null,
-            in_unit_laundry: prefs.in_unit_laundry || null,
-            gym: prefs.gym || null,
-            rooftop: prefs.rooftop || null,
-            doorman: prefs.doorman || null,
-            elevator: prefs.elevator || null,
-            outdoor_space: prefs.outdoor_space || null,
+            pet_friendly: prefs.pet_friendly ?? null,
+            parking_required: prefs.parking_required ?? null,
+            in_unit_laundry: prefs.in_unit_laundry ?? null,
+            gym: prefs.gym ?? null,
+            rooftop: prefs.rooftop ?? null,
+            doorman: prefs.doorman ?? null,
+            elevator: prefs.elevator ?? null,
+            outdoor_space: prefs.outdoor_space ?? null,
             move_in_date: prefs.move_in_date || null,
             lease_length: prefs.lease_length || null,
             other_requirements: prefs.other_requirements || [],
@@ -93,8 +93,14 @@ export async function POST(req: NextRequest) {
             summary: prefs.summary || null,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'user_id' })
-        preferencesExtracted = true
-      } catch {}
+        if (upsertError) {
+          console.error('Preferences upsert error:', upsertError)
+        } else {
+          preferencesExtracted = true
+        }
+      } catch (parseErr) {
+        console.error('Preferences parse error:', parseErr)
+      }
     }
 
     // Save updated conversation
