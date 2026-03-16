@@ -214,6 +214,24 @@ async function runSearchInBackground(
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { searchParams } = new URL(req.url)
+  const searchRunId = searchParams.get('runId')
+  if (!searchRunId) return NextResponse.json({ error: 'runId required' }, { status: 400 })
+
+  await supabase
+    .from('search_runs')
+    .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+    .eq('id', searchRunId)
+    .eq('user_id', user.id)
+
+  return NextResponse.json({ ok: true })
+}
+
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

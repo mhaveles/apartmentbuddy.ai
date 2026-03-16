@@ -25,7 +25,7 @@ export default function ListingsPage() {
     async function checkRunning() {
       const res = await fetch('/api/search')
       const runs = await res.json()
-      const running = Array.isArray(runs) ? runs.find((r: { status: string; id: string }) => r.status === 'running') : null
+      const running = Array.isArray(runs) ? runs.find((r: { status: string; id: string }) => r.status === 'running' || r.status === 'pending') : null
       if (running) {
         setSearching(true)
         setSearchStatus('running')
@@ -42,7 +42,7 @@ export default function ListingsPage() {
       const res = await fetch(`/api/search?runId=${searchRunId}`)
       const run = await res.json()
       setSearchStatus(run.status)
-      if (run.status === 'completed' || run.status === 'failed') {
+      if (run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled') {
         clearInterval(interval)
         setSearching(false)
         setSearchRunId(null)
@@ -51,6 +51,14 @@ export default function ListingsPage() {
     }, 3000)
     return () => clearInterval(interval)
   }, [searchRunId, loadListings])
+
+  async function cancelSearch() {
+    if (!searchRunId) return
+    await fetch(`/api/search?runId=${searchRunId}`, { method: 'DELETE' })
+    setSearching(false)
+    setSearchRunId(null)
+    setSearchStatus(null)
+  }
 
   async function runSearch() {
     setSearching(true)
@@ -107,9 +115,17 @@ export default function ListingsPage() {
       </div>
 
       {searching && (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-sm text-indigo-700">
-          Scraping listings and scoring them with AI… this takes 1-2 minutes.
-          {searchStatus && <span className="ml-2 font-medium capitalize">{searchStatus}</span>}
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-sm text-indigo-700 flex items-center justify-between">
+          <span>
+            Scraping listings and scoring them with AI… this takes 1-2 minutes.
+            {searchStatus && <span className="ml-2 font-medium capitalize">{searchStatus}</span>}
+          </span>
+          <button
+            onClick={cancelSearch}
+            className="ml-4 text-xs text-indigo-500 hover:text-red-600 underline shrink-0"
+          >
+            Cancel
+          </button>
         </div>
       )}
 
