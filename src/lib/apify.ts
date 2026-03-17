@@ -1,9 +1,10 @@
-import { ApifyClient } from 'apify-client'
-import type { WebhookEventType } from 'apify-client'
+// Uses Apify REST API directly (no SDK) to avoid proxy-agent bundling issues on Vercel
 
-const client = new ApifyClient({
-  token: process.env.APIFY_API_TOKEN!,
-})
+const APIFY_BASE = 'https://api.apify.com/v2'
+
+function token() {
+  return process.env.APIFY_API_TOKEN!
+}
 
 export interface ScrapedListing {
   externalId: string
@@ -27,9 +28,9 @@ export interface ScrapedListing {
 
 type Neighborhood = Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
 
-function buildWebhook(webhookUrl: string, searchRunId: string, source: string) {
+function buildWebhooks(webhookUrl: string, searchRunId: string, source: string) {
   return [{
-    eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED'] as WebhookEventType[],
+    eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED'],
     requestUrl: webhookUrl,
     payloadTemplate: JSON.stringify({
       searchRunId,
@@ -41,6 +42,21 @@ function buildWebhook(webhookUrl: string, searchRunId: string, source: string) {
   }]
 }
 
+async function startActor(actorId: string, input: unknown, webhooks: unknown[]): Promise<string> {
+  const url = `${APIFY_BASE}/acts/${encodeURIComponent(actorId)}/runs?token=${token()}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...input as object, webhooks }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Apify start failed for ${actorId}: ${res.status} ${text}`)
+  }
+  const data = await res.json()
+  return data.data.id as string
+}
+
 export async function startZillowScrape(
   neighborhoods: Neighborhood,
   webhookUrl: string,
@@ -50,14 +66,11 @@ export async function startZillowScrape(
     const query = n.zip_code || `${n.neighborhood} ${n.city} ${n.state}`
     return `https://www.zillow.com/homes/for_rent/${encodeURIComponent(query)}_rb/`
   })
-
-  const run = await client.actor('maxcopell/zillow-scraper').start({
+  return startActor('maxcopell/zillow-scraper', {
     startUrls: searchUrls.map(url => ({ url })),
     maxItems: 50,
     type: 'rent',
-  }, { webhooks: buildWebhook(webhookUrl, searchRunId, 'zillow') })
-
-  return run.id
+  }, buildWebhooks(webhookUrl, searchRunId, 'zillow'))
 }
 
 export async function startApartmentsComScrape(
@@ -69,13 +82,10 @@ export async function startApartmentsComScrape(
     const location = n.zip_code || `${n.neighborhood.toLowerCase().replace(/\s+/g, '-')}-${n.city.toLowerCase()}-${n.state.toLowerCase()}`
     return `https://www.apartments.com/${location}/`
   })
-
-  const run = await client.actor('parseforge/apartments-com-scraper').start({
+  return startActor('parseforge/apartments-com-scraper', {
     startUrls: searchUrls.map(url => ({ url })),
     maxItems: 50,
-  }, { webhooks: buildWebhook(webhookUrl, searchRunId, 'apartments_com') })
-
-  return run.id
+  }, buildWebhooks(webhookUrl, searchRunId, 'apartments_com'))
 }
 
 export async function startCraigslistScrape(
@@ -88,13 +98,10 @@ export async function startCraigslistScrape(
     const query = encodeURIComponent(n.zip_code || `${n.neighborhood} ${n.city}`)
     return `https://${citySlug}.craigslist.org/search/apa?query=${query}&section=apa`
   })
-
-  const run = await client.actor('automation-lab/craigslist-scraper').start({
+  return startActor('automation-lab/craigslist-scraper', {
     startUrls: searchUrls.map(url => ({ url })),
     maxItems: 50,
-  }, { webhooks: buildWebhook(webhookUrl, searchRunId, 'craigslist') })
-
-  return run.id
+  }, buildWebhooks(webhookUrl, searchRunId, 'craigslist'))
 }
 
 export async function startTruliaScrape(
@@ -106,23 +113,22 @@ export async function startTruliaScrape(
     const location = n.zip_code || `${n.neighborhood.toLowerCase().replace(/\s+/g, '-')}-${n.city.toLowerCase()}-${n.state.toLowerCase()}`
     return `https://www.trulia.com/for_rent/${location}/`
   })
-
-  const run = await client.actor('epctex/trulia-scraper').start({
+  return startActor('epctex/trulia-scraper', {
     startUrls: searchUrls.map(url => ({ url })),
     maxItems: 50,
-  }, { webhooks: buildWebhook(webhookUrl, searchRunId, 'trulia') })
-
-  return run.id
+  }, buildWebhooks(webhookUrl, searchRunId, 'trulia'))
 }
 
 export async function fetchScrapedListings(
   datasetId: string,
   source: string
 ): Promise<ScrapedListing[]> {
-  const { items } = await client.dataset(datasetId).listItems()
+  const res = await fetch(`${APIFY_BASE}/datasets/${datasetId}/items?token=${token()}&clean=true`)
+  if (!res.ok) throw new Error(`Failed to fetch dataset ${datasetId}: ${res.status}`)
+  const items: Record<string, unknown>[] = await res.json()
 
   if (source === 'zillow') {
-    return items.map((item: Record<string, unknown>) => ({
+    return items.map(item => ({
       externalId: String(item.zpid || item.id || Math.random()),
       source: 'zillow',
       url: String(item.detailUrl || item.url || ''),
@@ -144,7 +150,7 @@ export async function fetchScrapedListings(
   }
 
   if (source === 'apartments_com') {
-    return items.map((item: Record<string, unknown>) => ({
+    return items.map(item => ({
       externalId: String(item.id || item.propertyId || Math.random()),
       source: 'apartments_com',
       url: String(item.url || item.detailUrl || ''),
@@ -166,7 +172,7 @@ export async function fetchScrapedListings(
   }
 
   if (source === 'craigslist') {
-    return items.map((item: Record<string, unknown>) => ({
+    return items.map(item => ({
       externalId: String(item.id || item.postId || Math.random()),
       source: 'craigslist',
       url: String(item.url || ''),
@@ -188,7 +194,7 @@ export async function fetchScrapedListings(
   }
 
   if (source === 'trulia') {
-    return items.map((item: Record<string, unknown>) => ({
+    return items.map(item => ({
       externalId: String(item.id || item.propertyId || Math.random()),
       source: 'trulia',
       url: String(item.url || ''),
