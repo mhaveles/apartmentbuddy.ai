@@ -111,10 +111,18 @@ create table public.search_runs (
   listings_scored integer default 0,
   status text not null default 'pending', -- 'pending' | 'running' | 'completed' | 'failed'
   error text,
+  apify_runs_pending int not null default 0,
+  apify_run_ids jsonb not null default '{}',
   started_at timestamptz,
   completed_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+-- Migration: add apify tracking columns to existing search_runs tables
+-- Run this in the Supabase SQL editor if the table already exists:
+-- alter table public.search_runs
+--   add column if not exists apify_runs_pending int not null default 0,
+--   add column if not exists apify_run_ids jsonb not null default '{}';
 
 -- Row Level Security
 alter table public.profiles enable row level security;
@@ -165,6 +173,15 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Function to atomically decrement apify_runs_pending, returns updated row
+create or replace function public.decrement_apify_runs_pending(run_id uuid)
+returns public.search_runs as $$
+  update public.search_runs
+  set apify_runs_pending = greatest(0, apify_runs_pending - 1)
+  where id = run_id
+  returning *;
+$$ language sql security definer;
 
 -- Function to refund a search credit on failed runs
 create or replace function public.decrement_searches_used(user_id uuid)

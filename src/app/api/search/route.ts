@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse, after } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { anthropic, SCORING_PROMPT } from '@/lib/anthropic'
-import { scrapeZillow, scrapeApartmentsCom, scrapeCraigslist, scrapeTrulia } from '@/lib/apify'
+import { startZillowScrape, startApartmentsComScrape, startCraigslistScrape, startTruliaScrape } from '@/lib/apify'
 import { FREE_SEARCH_LIMIT } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
@@ -65,14 +64,15 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       neighborhoods: neighborhoods.map(n => `${n.neighborhood}, ${n.city}, ${n.state}`),
       status: 'running',
+      apify_runs_pending: 4,
       started_at: new Date().toISOString(),
     })
     .select()
     .single()
 
-  // Return immediately — scraping happens async
-  // In production this would be a background job / queue
-  // For now we fire-and-forget via edge function
+  if (!searchRun) {
+    return NextResponse.json({ error: 'Failed to create search run' }, { status: 500 })
+  }
 
   // Update searches used for free tier
   if (profile.plan === 'free') {
@@ -82,142 +82,30 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
   }
 
-  // Use after() so Vercel keeps the function alive until scraping completes
-  after(() => runSearchInBackground(user.id, neighborhoods, preferences, searchRun!.id, profile.plan === 'free').catch(console.error))
+  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/apify/webhook?secret=${process.env.CRON_SECRET}`
 
-  return NextResponse.json({ searchRunId: searchRun!.id, status: 'running' })
-}
+  // Fire all 4 scrapers in parallel — returns in ~500ms
+  const [zillowRunId, apartmentsRunId, craigslistRunId, truliaRunId] = await Promise.all([
+    startZillowScrape(neighborhoods, webhookUrl, searchRun.id),
+    startApartmentsComScrape(neighborhoods, webhookUrl, searchRun.id),
+    startCraigslistScrape(neighborhoods, webhookUrl, searchRun.id),
+    startTruliaScrape(neighborhoods, webhookUrl, searchRun.id),
+  ])
 
-async function runSearchInBackground(
-  userId: string,
-  neighborhoods: Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>,
-  preferences: Record<string, unknown>,
-  searchRunId: string,
-  isFreeUser: boolean
-) {
-  // Use service role for background work
-  const { createServiceClient } = await import('@/lib/supabase/server')
-  const supabase = await createServiceClient()
+  // Store run IDs for reference
+  await supabase
+    .from('search_runs')
+    .update({
+      apify_run_ids: {
+        zillow: zillowRunId,
+        apartments_com: apartmentsRunId,
+        craigslist: craigslistRunId,
+        trulia: truliaRunId,
+      },
+    })
+    .eq('id', searchRun.id)
 
-  try {
-    // Scrape listings
-    const [zillowListings, apartmentsListings, craigslistListings, truliaListings] = await Promise.all([
-      scrapeZillow(neighborhoods),
-      scrapeApartmentsCom(neighborhoods),
-      scrapeCraigslist(neighborhoods),
-      scrapeTrulia(neighborhoods),
-    ])
-
-    const allListings = [...zillowListings, ...apartmentsListings, ...craigslistListings, ...truliaListings]
-
-    await supabase
-      .from('search_runs')
-      .update({ listings_found: allListings.length })
-      .eq('id', searchRunId)
-
-    let scored = 0
-
-    for (const listing of allListings) {
-      // Upsert the listing
-      const { data: savedListing } = await supabase
-        .from('listings')
-        .upsert({
-          external_id: listing.externalId,
-          source: listing.source,
-          url: listing.url,
-          title: listing.title,
-          address: listing.address,
-          city: listing.city,
-          state: listing.state,
-          neighborhood: listing.neighborhood,
-          zip_code: listing.zipCode,
-          rent: listing.rent,
-          bedrooms: listing.bedrooms,
-          bathrooms: listing.bathrooms,
-          sqft: listing.sqft,
-          available_date: listing.availableDate,
-          amenities: listing.amenities,
-          description: listing.description,
-          images: listing.images,
-          scraped_at: new Date().toISOString(),
-        }, { onConflict: 'external_id,source' })
-        .select()
-        .single()
-
-      if (!savedListing) continue
-
-      // Check if already scored for this user
-      const { data: existing } = await supabase
-        .from('user_listings')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('listing_id', savedListing.id)
-        .single()
-
-      if (existing) continue
-
-      // Score with Claude
-      try {
-        const scoreResponse = await anthropic.messages.create({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 512,
-          system: SCORING_PROMPT,
-          messages: [{
-            role: 'user',
-            content: `User preferences:\n${JSON.stringify(preferences, null, 2)}\n\nListing:\n${JSON.stringify({
-              rent: listing.rent / 100,
-              bedrooms: listing.bedrooms,
-              bathrooms: listing.bathrooms,
-              sqft: listing.sqft,
-              amenities: listing.amenities,
-              neighborhood: listing.neighborhood,
-              city: listing.city,
-              description: listing.description,
-            }, null, 2)}`
-          }]
-        })
-
-        const scoreText = scoreResponse.content[0].type === 'text' ? scoreResponse.content[0].text : '{}'
-        const jsonMatch = scoreText.match(/\{[\s\S]*\}/)
-        if (jsonMatch) {
-          const scoreData = JSON.parse(jsonMatch[0])
-          await supabase.from('user_listings').insert({
-            user_id: userId,
-            listing_id: savedListing.id,
-            score: scoreData.score,
-            score_breakdown: scoreData.breakdown,
-            score_reasoning: scoreData.reasoning,
-          })
-          scored++
-        }
-      } catch (err) {
-        console.error('Scoring error:', err)
-      }
-    }
-
-    await supabase
-      .from('search_runs')
-      .update({
-        status: 'completed',
-        listings_scored: scored,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', searchRunId)
-  } catch (error) {
-    await supabase
-      .from('search_runs')
-      .update({
-        status: 'failed',
-        error: String(error),
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', searchRunId)
-
-    // Refund the search credit if the run failed
-    if (isFreeUser) {
-      await supabase.rpc('decrement_searches_used', { user_id: userId })
-    }
-  }
+  return NextResponse.json({ searchRunId: searchRun.id, status: 'running' })
 }
 
 export async function DELETE(req: NextRequest) {

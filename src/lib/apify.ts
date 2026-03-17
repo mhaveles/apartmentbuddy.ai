@@ -24,23 +24,103 @@ export interface ScrapedListing {
   images: string[]
 }
 
-export async function scrapeZillow(
-  neighborhoods: Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
-): Promise<ScrapedListing[]> {
+type Neighborhood = Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
+
+function buildWebhook(webhookUrl: string, searchRunId: string, source: string) {
+  return [{
+    eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED'],
+    requestUrl: webhookUrl,
+    payloadTemplate: JSON.stringify({
+      searchRunId,
+      source,
+      eventType: '{{eventType}}',
+      defaultDatasetId: '{{resource.defaultDatasetId}}',
+      actorRunId: '{{resource.id}}',
+    }),
+  }]
+}
+
+export async function startZillowScrape(
+  neighborhoods: Neighborhood,
+  webhookUrl: string,
+  searchRunId: string
+): Promise<string> {
   const searchUrls = neighborhoods.map(n => {
     const query = n.zip_code || `${n.neighborhood} ${n.city} ${n.state}`
     return `https://www.zillow.com/homes/for_rent/${encodeURIComponent(query)}_rb/`
   })
 
-  try {
-    const run = await client.actor('maxcopell/zillow-scraper').call({
-      startUrls: searchUrls.map(url => ({ url })),
-      maxItems: 50,
-      type: 'rent',
-    })
+  const run = await client.actor('maxcopell/zillow-scraper').start({
+    startUrls: searchUrls.map(url => ({ url })),
+    maxItems: 50,
+    type: 'rent',
+  }, { webhooks: buildWebhook(webhookUrl, searchRunId, 'zillow') })
 
-    const { items } = await client.dataset(run.defaultDatasetId).listItems()
+  return run.id
+}
 
+export async function startApartmentsComScrape(
+  neighborhoods: Neighborhood,
+  webhookUrl: string,
+  searchRunId: string
+): Promise<string> {
+  const searchUrls = neighborhoods.map(n => {
+    const location = n.zip_code || `${n.neighborhood.toLowerCase().replace(/\s+/g, '-')}-${n.city.toLowerCase()}-${n.state.toLowerCase()}`
+    return `https://www.apartments.com/${location}/`
+  })
+
+  const run = await client.actor('parseforge/apartments-com-scraper').start({
+    startUrls: searchUrls.map(url => ({ url })),
+    maxItems: 50,
+  }, { webhooks: buildWebhook(webhookUrl, searchRunId, 'apartments_com') })
+
+  return run.id
+}
+
+export async function startCraigslistScrape(
+  neighborhoods: Neighborhood,
+  webhookUrl: string,
+  searchRunId: string
+): Promise<string> {
+  const searchUrls = neighborhoods.map(n => {
+    const citySlug = n.city.toLowerCase().replace(/\s+/g, '')
+    const query = encodeURIComponent(n.zip_code || `${n.neighborhood} ${n.city}`)
+    return `https://${citySlug}.craigslist.org/search/apa?query=${query}&section=apa`
+  })
+
+  const run = await client.actor('automation-lab/craigslist-scraper').start({
+    startUrls: searchUrls.map(url => ({ url })),
+    maxItems: 50,
+  }, { webhooks: buildWebhook(webhookUrl, searchRunId, 'craigslist') })
+
+  return run.id
+}
+
+export async function startTruliaScrape(
+  neighborhoods: Neighborhood,
+  webhookUrl: string,
+  searchRunId: string
+): Promise<string> {
+  const searchUrls = neighborhoods.map(n => {
+    const location = n.zip_code || `${n.neighborhood.toLowerCase().replace(/\s+/g, '-')}-${n.city.toLowerCase()}-${n.state.toLowerCase()}`
+    return `https://www.trulia.com/for_rent/${location}/`
+  })
+
+  const run = await client.actor('epctex/trulia-scraper').start({
+    startUrls: searchUrls.map(url => ({ url })),
+    maxItems: 50,
+  }, { webhooks: buildWebhook(webhookUrl, searchRunId, 'trulia') })
+
+  return run.id
+}
+
+export async function fetchScrapedListings(
+  datasetId: string,
+  source: string
+): Promise<ScrapedListing[]> {
+  const { items } = await client.dataset(datasetId).listItems()
+
+  if (source === 'zillow') {
     return items.map((item: Record<string, unknown>) => ({
       externalId: String(item.zpid || item.id || Math.random()),
       source: 'zillow',
@@ -51,7 +131,7 @@ export async function scrapeZillow(
       state: String(item.state || ''),
       neighborhood: item.neighborhood ? String(item.neighborhood) : null,
       zipCode: item.zipcode ? String(item.zipcode) : null,
-      rent: Math.round((Number(item.price) || 0) * 100), // convert to cents
+      rent: Math.round((Number(item.price) || 0) * 100),
       bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
       bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
       sqft: item.livingArea ? Number(item.livingArea) : null,
@@ -60,112 +140,9 @@ export async function scrapeZillow(
       description: item.description ? String(item.description) : null,
       images: Array.isArray(item.photos) ? item.photos.map(String) : [],
     }))
-  } catch (error) {
-    console.error('Zillow scrape error:', error)
-    return []
   }
-}
 
-export async function scrapeCraigslist(
-  neighborhoods: Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
-): Promise<ScrapedListing[]> {
-  // Build Craigslist search URLs per neighborhood
-  const searchUrls = neighborhoods.map(n => {
-    const citySlug = n.city.toLowerCase().replace(/\s+/g, '')
-    const query = encodeURIComponent(n.zip_code || `${n.neighborhood} ${n.city}`)
-    return `https://${citySlug}.craigslist.org/search/apa?query=${query}&section=apa`
-  })
-
-  try {
-    const run = await client.actor('automation-lab/craigslist-scraper').call({
-      startUrls: searchUrls.map(url => ({ url })),
-      maxItems: 50,
-    })
-
-    const { items } = await client.dataset(run.defaultDatasetId).listItems()
-
-    return items.map((item: Record<string, unknown>) => ({
-      externalId: String(item.id || item.postId || Math.random()),
-      source: 'craigslist',
-      url: String(item.url || ''),
-      title: String(item.title || ''),
-      address: String(item.location || item.address || ''),
-      city: String(item.city || neighborhoods[0]?.city || ''),
-      state: String(item.state || neighborhoods[0]?.state || ''),
-      neighborhood: item.neighborhood ? String(item.neighborhood) : null,
-      zipCode: item.zipCode ? String(item.zipCode) : null,
-      rent: Math.round((Number(item.price) || 0) * 100),
-      bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
-      bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
-      sqft: item.sqft ? Number(item.sqft) : null,
-      availableDate: item.availableDate ? String(item.availableDate) : null,
-      amenities: [],
-      description: item.description ? String(item.description) : null,
-      images: Array.isArray(item.images) ? item.images.map(String) : [],
-    }))
-  } catch (error) {
-    console.error('Craigslist scrape error:', error)
-    return []
-  }
-}
-
-export async function scrapeTrulia(
-  neighborhoods: Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
-): Promise<ScrapedListing[]> {
-  const searchUrls = neighborhoods.map(n => {
-    const location = n.zip_code || `${n.neighborhood.toLowerCase().replace(/\s+/g, '-')}-${n.city.toLowerCase()}-${n.state.toLowerCase()}`
-    return `https://www.trulia.com/for_rent/${location}/`
-  })
-
-  try {
-    const run = await client.actor('epctex/trulia-scraper').call({
-      startUrls: searchUrls.map(url => ({ url })),
-      maxItems: 50,
-    })
-
-    const { items } = await client.dataset(run.defaultDatasetId).listItems()
-
-    return items.map((item: Record<string, unknown>) => ({
-      externalId: String(item.id || item.propertyId || Math.random()),
-      source: 'trulia',
-      url: String(item.url || ''),
-      title: String(item.title || item.name || ''),
-      address: String(item.address || item.streetAddress || ''),
-      city: String(item.city || ''),
-      state: String(item.state || ''),
-      neighborhood: item.neighborhood ? String(item.neighborhood) : null,
-      zipCode: item.zipCode ? String(item.zipCode) : null,
-      rent: Math.round((Number(item.price) || 0) * 100),
-      bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
-      bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
-      sqft: item.sqft ? Number(item.sqft) : null,
-      availableDate: item.availableDate ? String(item.availableDate) : null,
-      amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
-      description: item.description ? String(item.description) : null,
-      images: Array.isArray(item.photos) ? item.photos.map(String) : [],
-    }))
-  } catch (error) {
-    console.error('Trulia scrape error:', error)
-    return []
-  }
-}
-
-export async function scrapeApartmentsCom(
-  neighborhoods: Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
-): Promise<ScrapedListing[]> {
-  const searchUrls = neighborhoods.map(n => {
-    const location = n.zip_code || `${n.neighborhood.toLowerCase().replace(/\s+/g, '-')}-${n.city.toLowerCase()}-${n.state.toLowerCase()}`
-    return `https://www.apartments.com/${location}/`
-  })
-
-  try {
-    const run = await client.actor('parseforge/apartments-com-scraper').call({
-      startUrls: searchUrls.map(url => ({ url })),
-      maxItems: 50,
-    })
-
-    const { items } = await client.dataset(run.defaultDatasetId).listItems()
-
+  if (source === 'apartments_com') {
     return items.map((item: Record<string, unknown>) => ({
       externalId: String(item.id || item.propertyId || Math.random()),
       source: 'apartments_com',
@@ -185,8 +162,51 @@ export async function scrapeApartmentsCom(
       description: item.description ? String(item.description) : null,
       images: Array.isArray(item.photos) ? item.photos.map(String) : [],
     }))
-  } catch (error) {
-    console.error('Apartments.com scrape error:', error)
-    return []
   }
+
+  if (source === 'craigslist') {
+    return items.map((item: Record<string, unknown>) => ({
+      externalId: String(item.id || item.postId || Math.random()),
+      source: 'craigslist',
+      url: String(item.url || ''),
+      title: String(item.title || ''),
+      address: String(item.location || item.address || ''),
+      city: String(item.city || ''),
+      state: String(item.state || ''),
+      neighborhood: item.neighborhood ? String(item.neighborhood) : null,
+      zipCode: item.zipCode ? String(item.zipCode) : null,
+      rent: Math.round((Number(item.price) || 0) * 100),
+      bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
+      bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
+      sqft: item.sqft ? Number(item.sqft) : null,
+      availableDate: item.availableDate ? String(item.availableDate) : null,
+      amenities: [],
+      description: item.description ? String(item.description) : null,
+      images: Array.isArray(item.images) ? item.images.map(String) : [],
+    }))
+  }
+
+  if (source === 'trulia') {
+    return items.map((item: Record<string, unknown>) => ({
+      externalId: String(item.id || item.propertyId || Math.random()),
+      source: 'trulia',
+      url: String(item.url || ''),
+      title: String(item.title || item.name || ''),
+      address: String(item.address || item.streetAddress || ''),
+      city: String(item.city || ''),
+      state: String(item.state || ''),
+      neighborhood: item.neighborhood ? String(item.neighborhood) : null,
+      zipCode: item.zipCode ? String(item.zipCode) : null,
+      rent: Math.round((Number(item.price) || 0) * 100),
+      bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
+      bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
+      sqft: item.sqft ? Number(item.sqft) : null,
+      availableDate: item.availableDate ? String(item.availableDate) : null,
+      amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
+      description: item.description ? String(item.description) : null,
+      images: Array.isArray(item.photos) ? item.photos.map(String) : [],
+    }))
+  }
+
+  return []
 }
