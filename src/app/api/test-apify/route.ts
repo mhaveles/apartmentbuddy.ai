@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      startUrls: [{ url: 'https://www.zillow.com/homes/for_rent/New-York_rb/' }],
+      searchUrls: [{ url: 'https://www.zillow.com/homes/for_rent/New-York_rb/' }],
       maxItems: 3,
       type: 'rent',
     }),

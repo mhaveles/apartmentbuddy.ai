@@ -67,7 +67,7 @@ export async function startZillowScrape(
     return `https://www.zillow.com/homes/for_rent/${encodeURIComponent(query)}_rb/`
   })
   return startActor('maxcopell/zillow-scraper', {
-    startUrls: searchUrls.map(url => ({ url })),
+    searchUrls: searchUrls.map(url => ({ url })),
     maxItems: 50,
     type: 'rent',
   }, buildWebhooks(webhookUrl, searchRunId, 'zillow'))
