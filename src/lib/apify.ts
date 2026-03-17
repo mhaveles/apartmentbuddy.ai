@@ -1,4 +1,5 @@
 import { ApifyClient } from 'apify-client'
+import type { WebhookEventType } from 'apify-client'
 
 const client = new ApifyClient({
   token: process.env.APIFY_API_TOKEN!,
@@ -28,7 +29,7 @@ type Neighborhood = Array<{ city: string; state: string; neighborhood: string; z
 
 function buildWebhook(webhookUrl: string, searchRunId: string, source: string) {
   return [{
-    eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED'],
+    eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED'] as WebhookEventType[],
     requestUrl: webhookUrl,
     payloadTemplate: JSON.stringify({
       searchRunId,
