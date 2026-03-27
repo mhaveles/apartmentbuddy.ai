@@ -62,9 +62,25 @@ export async function startZillowScrape(
   webhookUrl: string,
   searchRunId: string
 ): Promise<string> {
+  // Zillow actor requires URLs with searchQueryState param — simple /homes/for_rent/city_rb/ format is rejected
   const searchUrls = neighborhoods.map(n => {
-    const query = n.zip_code || `${n.neighborhood} ${n.city} ${n.state}`
-    return `https://www.zillow.com/homes/for_rent/${encodeURIComponent(query)}_rb/`
+    const searchTerm = n.zip_code || `${n.neighborhood}, ${n.city}, ${n.state}`
+    const searchQueryState = JSON.stringify({
+      pagination: {},
+      isMapVisible: false,
+      isListVisible: true,
+      usersSearchTerm: searchTerm,
+      filterState: {
+        fr:   { value: true  },
+        fsba: { value: false },
+        fsbo: { value: false },
+        nc:   { value: false },
+        cmsn: { value: false },
+        auc:  { value: false },
+        fore: { value: false },
+      },
+    })
+    return `https://www.zillow.com/homes/for_rent/?searchQueryState=${encodeURIComponent(searchQueryState)}`
   })
   return startActor('maxcopell/zillow-scraper', {
     searchUrls: searchUrls.map(url => ({ url })),

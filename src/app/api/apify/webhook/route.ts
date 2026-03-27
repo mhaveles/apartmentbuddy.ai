@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = await createServiceClient()
 
-  // Look up search run and user preferences
+  // Look up search run
   const { data: searchRun } = await supabase
     .from('search_runs')
     .select('*')
@@ -34,6 +34,16 @@ export async function POST(req: NextRequest) {
 
   const userId = searchRun.user_id
 
+  // Decrement FIRST — before any scoring — so a timeout mid-scoring never
+  // leaves apify_runs_pending stuck and the run status never updating.
+  const { data: updated } = await supabase
+    .rpc('decrement_apify_runs_pending', { run_id: searchRunId })
+    .select()
+    .single()
+
+  const allDone = updated && (updated as { apify_runs_pending: number }).apify_runs_pending === 0
+
+  // Process listings on success
   if (eventType === 'ACTOR.RUN.SUCCEEDED' && defaultDatasetId) {
     const { data: preferences } = await supabase
       .from('preferences')
@@ -132,18 +142,12 @@ export async function POST(req: NextRequest) {
       .eq('id', searchRunId)
   }
 
-  // Atomically decrement pending count (safe against concurrent webhook calls)
-  const { data: updated } = await supabase
-    .rpc('decrement_apify_runs_pending', { run_id: searchRunId })
-    .select()
-    .single()
-
-  // Mark completed when all actors have reported back
-  if (updated && (updated as { apify_runs_pending: number }).apify_runs_pending === 0) {
+  // Mark completed/failed once all actors have reported back
+  if (allDone) {
     await supabase
       .from('search_runs')
       .update({
-        status: 'completed',
+        status: eventType === 'ACTOR.RUN.FAILED' ? 'failed' : 'completed',
         completed_at: new Date().toISOString(),
       })
       .eq('id', searchRunId)

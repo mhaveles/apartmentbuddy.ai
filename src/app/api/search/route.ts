@@ -84,28 +84,53 @@ export async function POST(req: NextRequest) {
 
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/apify/webhook?secret=${process.env.CRON_SECRET}`
 
-  // Fire all 4 scrapers in parallel — returns in ~500ms
-  const [zillowRunId, apartmentsRunId, craigslistRunId, truliaRunId] = await Promise.all([
+  // Fire all 4 scrapers in parallel — use allSettled so one failure doesn't kill the rest
+  const [zillowResult, apartmentsResult, craigslistResult, truliaResult] = await Promise.allSettled([
     startZillowScrape(neighborhoods, webhookUrl, searchRun.id),
     startApartmentsComScrape(neighborhoods, webhookUrl, searchRun.id),
     startCraigslistScrape(neighborhoods, webhookUrl, searchRun.id),
     startTruliaScrape(neighborhoods, webhookUrl, searchRun.id),
   ])
 
-  // Store run IDs for reference
+  const runIds = {
+    zillow:         zillowResult.status     === 'fulfilled' ? zillowResult.value     : null,
+    apartments_com: apartmentsResult.status === 'fulfilled' ? apartmentsResult.value : null,
+    craigslist:     craigslistResult.status === 'fulfilled' ? craigslistResult.value : null,
+    trulia:         truliaResult.status     === 'fulfilled' ? truliaResult.value     : null,
+  }
+
+  const successfulStarts = Object.values(runIds).filter(Boolean).length
+
+  // Log any failures for debugging
+  const failures = [
+    zillowResult.status     === 'rejected' ? `zillow: ${zillowResult.reason}`         : null,
+    apartmentsResult.status === 'rejected' ? `apartments_com: ${apartmentsResult.reason}` : null,
+    craigslistResult.status === 'rejected' ? `craigslist: ${craigslistResult.reason}`  : null,
+    truliaResult.status     === 'rejected' ? `trulia: ${truliaResult.reason}`          : null,
+  ].filter(Boolean)
+
+  if (failures.length > 0) {
+    console.error('Some actors failed to start:', failures)
+  }
+
+  if (successfulStarts === 0) {
+    await supabase
+      .from('search_runs')
+      .update({ status: 'failed', completed_at: new Date().toISOString() })
+      .eq('id', searchRun.id)
+    return NextResponse.json({ error: 'All scrapers failed to start', details: failures }, { status: 500 })
+  }
+
+  // Store run IDs and set pending count to only the actors that actually started
   await supabase
     .from('search_runs')
     .update({
-      apify_run_ids: {
-        zillow: zillowRunId,
-        apartments_com: apartmentsRunId,
-        craigslist: craigslistRunId,
-        trulia: truliaRunId,
-      },
+      apify_run_ids: runIds,
+      apify_runs_pending: successfulStarts,
     })
     .eq('id', searchRun.id)
 
-  return NextResponse.json({ searchRunId: searchRun.id, status: 'running' })
+  return NextResponse.json({ searchRunId: searchRun.id, status: 'running', started: successfulStarts, failures })
 }
 
 export async function DELETE(req: NextRequest) {
