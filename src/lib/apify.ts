@@ -117,11 +117,19 @@ export async function startCraigslistScrape(
   // Requires startUrls (array of {url} objects)
   // Drop text query= — it filters to only listings containing the keyword, decimating results.
   // Use postal= for zip-scoped searches; fall back to browsing all apartments in the city.
-  // actor uses city + category fields as primary inputs (searchQueries = keyword search within those)
-  // category "apa" = Craigslist's apartments/housing-for-rent section
+  // actor requires searchQueries (won't start without it), but also uses city + category
+  // to determine WHERE to search. Pass all three so our city/category override the defaults.
+  const searchQueries = neighborhoods.map(n => {
+    const citySlug = n.city.toLowerCase().replace(/\s+/g, '')
+    const params = n.zip_code
+      ? `?postal=${n.zip_code}&search_distance=5&sort=date`
+      : `?sort=date`
+    return `https://${citySlug}.craigslist.org/search/apa${params}`
+  })
   const first = neighborhoods[0]
   const city = first.city.toLowerCase().replace(/\s+/g, '')
   return startActor('automation-lab/craigslist-scraper', {
+    searchQueries,
     city,
     category: 'apa',
     maxItems: 50,
