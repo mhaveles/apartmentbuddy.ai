@@ -86,7 +86,8 @@ export default function ListingsPage() {
         window.location.href = '/upgrade'
         return
       }
-      alert(data.error)
+      const detail = data.details?.length ? `\n\n${data.details.join('\n')}` : ''
+      alert(data.error + detail)
       setSearching(false)
       return
     }
