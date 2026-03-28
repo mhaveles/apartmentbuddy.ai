@@ -1,34 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Diagnostic endpoint — confirms Apify connectivity from Vercel
-// Usage: GET /api/test-apify?secret=<CRON_SECRET>
+// Diagnostic endpoint — test Zillow and/or Craigslist actor starts independently
+// Usage:
+//   GET /api/test-apify?secret=X&actor=zillow
+//   GET /api/test-apify?secret=X&actor=craigslist
+//   GET /api/test-apify?secret=X&actor=all&zip=80218&city=denver
+
+const APIFY_BASE = 'https://api.apify.com/v2'
+
+async function startTestActor(actorId: string, input: unknown, token: string) {
+  const res = await fetch(`${APIFY_BASE}/acts/${encodeURIComponent(actorId)}/runs?token=${token}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    return { ok: false, status: res.status, error: text }
+  }
+  const data = JSON.parse(text)
+  return {
+    ok: true,
+    runId: data.data.id as string,
+    consoleUrl: `https://console.apify.com/actors/runs/${data.data.id}`,
+  }
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   if (searchParams.get('secret') !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const token = process.env.APIFY_API_TOKEN
-  const res = await fetch(`https://api.apify.com/v2/acts/maxcopell~zillow-scraper/runs?token=${token}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      searchUrls: [{ url: 'https://www.zillow.com/homes/for_rent/New-York_rb/' }],
-      maxItems: 3,
-      type: 'rent',
-    }),
-  })
+  const actor = searchParams.get('actor') || 'all'
+  const token = process.env.APIFY_API_TOKEN!
+  const zip = searchParams.get('zip') || '80218'
+  const city = searchParams.get('city') || 'denver'
 
-  if (!res.ok) {
-    const text = await res.text()
-    return NextResponse.json({ error: `Apify error: ${res.status}`, detail: text }, { status: 500 })
+  const zillowInput = {
+    searchUrls: [{
+      url: `https://www.zillow.com/${zip}_rb/?searchQueryState=${encodeURIComponent(JSON.stringify({
+        pagination: {},
+        isMapVisible: false,
+        isListVisible: true,
+        filterState: {
+          fr:   { value: true  },
+          fsba: { value: false },
+          fsbo: { value: false },
+          nc:   { value: false },
+          cmsn: { value: false },
+          auc:  { value: false },
+          fore: { value: false },
+        },
+      }))}`,
+    }],
+    maxItems: 3,
+    type: 'rent',
   }
 
-  const data = await res.json()
-  const runId = data.data.id
+  const craigslistInput = {
+    startUrls: [{ url: `https://${city}.craigslist.org/search/apa?postal=${zip}&search_distance=5&sort=date` }],
+    maxItems: 3,
+  }
 
-  return NextResponse.json({
-    runId,
-    apifyConsoleUrl: `https://console.apify.com/actors/runs/${runId}`,
-  })
+  const results: Record<string, unknown> = {}
+
+  if (actor === 'zillow' || actor === 'all') {
+    results.zillow = await startTestActor('maxcopell/zillow-scraper', zillowInput, token)
+  }
+
+  if (actor === 'craigslist' || actor === 'all') {
+    results.craigslist = await startTestActor('automation-lab/craigslist-scraper', craigslistInput, token)
+  }
+
+  return NextResponse.json(results)
 }

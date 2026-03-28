@@ -62,31 +62,34 @@ export async function startZillowScrape(
   webhookUrl: string,
   searchRunId: string
 ): Promise<string> {
-  // actor: maxcopell/zillow-scraper — requires searchUrls with searchQueryState param
-  // Use current Zillow filter keys (isForRent, not the old fr shorthand)
+  // actor: maxcopell/zillow-scraper — requires searchUrls with ?searchQueryState= in the URL
+  // The geographic identifier MUST be in the URL path (e.g. /80218_rb/ or /denver-co/rentals/)
+  // so Zillow scopes the search to that area. Without it, 0 results.
+  // Use short-form filter keys (fr, fsba) — the actor parses Zillow's public URL format.
   const searchUrls = neighborhoods.map(n => {
-    const searchTerm = n.zip_code || `${n.neighborhood}, ${n.city}, ${n.state}`
+    const geoPath = n.zip_code
+      ? `${n.zip_code}_rb`
+      : `${n.city.toLowerCase().replace(/\s+/g, '-')}-${n.state.toLowerCase()}/rentals`
     const searchQueryState = JSON.stringify({
       pagination: {},
       isMapVisible: false,
       isListVisible: true,
-      usersSearchTerm: searchTerm,
       filterState: {
-        isForRent:                    { value: true  },
-        isForSaleByAgent:             { value: false },
-        isForSaleByOwner:             { value: false },
-        isNewConstruction:            { value: false },
-        isComingSoon:                 { value: false },
-        isAuction:                    { value: false },
-        isPreMarketForeclosure:       { value: false },
-        isPreMarketPreForeclosure:    { value: false },
+        fr:   { value: true  },
+        fsba: { value: false },
+        fsbo: { value: false },
+        nc:   { value: false },
+        cmsn: { value: false },
+        auc:  { value: false },
+        fore: { value: false },
       },
     })
-    return { url: `https://www.zillow.com/homes/for_rent/?searchQueryState=${encodeURIComponent(searchQueryState)}` }
+    return { url: `https://www.zillow.com/${geoPath}/?searchQueryState=${encodeURIComponent(searchQueryState)}` }
   })
   return startActor('maxcopell/zillow-scraper', {
     searchUrls,
     maxItems: 50,
+    type: 'rent',
   }, buildWebhooks(webhookUrl, searchRunId, 'zillow'))
 }
 
@@ -111,12 +114,15 @@ export async function startCraigslistScrape(
   searchRunId: string
 ): Promise<string> {
   // actor: automation-lab/craigslist-scraper
-  // Requires startUrls (array of {url} objects) — not searchQueries
-  // /search/apa is the apartments category; no need for &section=apa
+  // Requires startUrls (array of {url} objects)
+  // Drop text query= — it filters to only listings containing the keyword, decimating results.
+  // Use postal= for zip-scoped searches; fall back to browsing all apartments in the city.
   const startUrls = neighborhoods.map(n => {
     const citySlug = n.city.toLowerCase().replace(/\s+/g, '')
-    const query = encodeURIComponent(n.zip_code || `${n.neighborhood} ${n.city}`)
-    return { url: `https://${citySlug}.craigslist.org/search/apa?query=${query}` }
+    const params = n.zip_code
+      ? `?postal=${n.zip_code}&search_distance=5&sort=date`
+      : `?sort=date`
+    return { url: `https://${citySlug}.craigslist.org/search/apa${params}` }
   })
   return startActor('automation-lab/craigslist-scraper', {
     startUrls,

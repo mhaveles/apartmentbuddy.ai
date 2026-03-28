@@ -142,14 +142,20 @@ export async function POST(req: NextRequest) {
       .eq('id', searchRunId)
   }
 
-  // Mark completed/failed once all actors have reported back
+  // Mark completed/failed once all actors have reported back.
+  // Only mark 'failed' if zero listings found AND the last event was a failure —
+  // partial results (some actors succeeded) should still be 'completed'.
   if (allDone) {
+    const { data: finalRun } = await supabase
+      .from('search_runs')
+      .select('listings_found')
+      .eq('id', searchRunId)
+      .single()
+    const totalFound = (finalRun?.listings_found as number | null) ?? 0
+    const finalStatus = eventType === 'ACTOR.RUN.FAILED' && totalFound === 0 ? 'failed' : 'completed'
     await supabase
       .from('search_runs')
-      .update({
-        status: eventType === 'ACTOR.RUN.FAILED' ? 'failed' : 'completed',
-        completed_at: new Date().toISOString(),
-      })
+      .update({ status: finalStatus, completed_at: new Date().toISOString() })
       .eq('id', searchRunId)
   }
 

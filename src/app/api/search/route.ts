@@ -101,13 +101,13 @@ export async function POST(req: NextRequest) {
 
   const successfulStarts = Object.values(runIds).filter(Boolean).length
 
-  // Log any failures for debugging
+  // Log any failures for debugging — extract .message so Error objects serialize correctly
   const failures = [
-    zillowResult.status     === 'rejected' ? `zillow: ${zillowResult.reason}`         : null,
-    apartmentsResult.status === 'rejected' ? `apartments_com: ${apartmentsResult.reason}` : null,
-    craigslistResult.status === 'rejected' ? `craigslist: ${craigslistResult.reason}`  : null,
-    truliaResult.status     === 'rejected' ? `trulia: ${truliaResult.reason}`          : null,
-  ].filter(Boolean)
+    zillowResult.status     === 'rejected' ? `zillow: ${(zillowResult.reason as Error).message}`         : null,
+    apartmentsResult.status === 'rejected' ? `apartments_com: ${(apartmentsResult.reason as Error).message}` : null,
+    craigslistResult.status === 'rejected' ? `craigslist: ${(craigslistResult.reason as Error).message}`  : null,
+    truliaResult.status     === 'rejected' ? `trulia: ${(truliaResult.reason as Error).message}`          : null,
+  ].filter(Boolean) as string[]
 
   if (failures.length > 0) {
     console.error('Some actors failed to start:', failures)

@@ -11,6 +11,8 @@ export default function ListingsPage() {
   const [savedOnly, setSavedOnly] = useState(false)
   const [searchStatus, setSearchStatus] = useState<string | null>(null)
   const [searchTimedOut, setSearchTimedOut] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
+  const [scraperWarnings, setScraperWarnings] = useState<string[]>([])
   const pollStartRef = useRef<number | null>(null)
 
   const loadListings = useCallback(async () => {
@@ -22,15 +24,16 @@ export default function ListingsPage() {
 
   useEffect(() => { loadListings() }, [loadListings])
 
-  // On load, check if there's already a running search and resume polling
+  // On load, resume polling if there's an in-progress search (up to 12 min old)
   useEffect(() => {
     async function checkRunning() {
       const res = await fetch('/api/search')
       const runs = await res.json()
-      const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+      if (Array.isArray(runs) && runs.length > 0) setHasSearched(true)
+      const twelveMinAgo = new Date(Date.now() - 12 * 60 * 1000).toISOString()
       const running = Array.isArray(runs)
         ? runs.find((r: { status: string; id: string; started_at: string }) =>
-            (r.status === 'running' || r.status === 'pending') && r.started_at > fifteenMinAgo)
+            (r.status === 'running' || r.status === 'pending') && r.started_at > twelveMinAgo)
         : null
       if (running) {
         setSearching(true)
@@ -42,27 +45,32 @@ export default function ListingsPage() {
     checkRunning()
   }, [])
 
-  // Poll search run status — bail out after 10 minutes to avoid infinite spinner
+  // Poll search run status — bail after 12 min, retry on transient errors
   useEffect(() => {
     if (!searchRunId) return
     const interval = setInterval(async () => {
-      // Time out after 10 minutes
-      if (pollStartRef.current && Date.now() - pollStartRef.current > 10 * 60 * 1000) {
+      if (pollStartRef.current && Date.now() - pollStartRef.current > 12 * 60 * 1000) {
         clearInterval(interval)
         setSearching(false)
         setSearchRunId(null)
         setSearchTimedOut(true)
         return
       }
-      const res = await fetch(`/api/search?runId=${searchRunId}`)
-      const run = await res.json()
-      setSearchStatus(run.status)
-      if (run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled') {
-        clearInterval(interval)
-        setSearching(false)
-        setSearchRunId(null)
-        setSearchTimedOut(false)
-        if (run.status === 'completed') loadListings()
+      try {
+        const res = await fetch(`/api/search?runId=${searchRunId}`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const run = await res.json()
+        setSearchStatus(run.status)
+        if (run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled') {
+          clearInterval(interval)
+          setSearching(false)
+          setSearchRunId(null)
+          setSearchTimedOut(false)
+          setHasSearched(true)
+          if (run.status === 'completed') loadListings()
+        }
+      } catch (err) {
+        console.warn('Poll error (will retry):', err)
       }
     }, 3000)
     return () => clearInterval(interval)
@@ -79,6 +87,8 @@ export default function ListingsPage() {
   async function runSearch() {
     setSearching(true)
     setSearchStatus('running')
+    setScraperWarnings([])
+    setSearchTimedOut(false)
     const res = await fetch('/api/search', { method: 'POST' })
     const data = await res.json()
     if (data.error) {
@@ -86,12 +96,17 @@ export default function ListingsPage() {
         window.location.href = '/upgrade'
         return
       }
-      const detail = data.details?.length ? `\n\n${data.details.join('\n')}` : ''
+      const detail = Array.isArray(data.details) && data.details.length
+        ? `\n\n${data.details.join('\n')}`
+        : ''
       alert(data.error + detail)
       setSearching(false)
       return
     }
-    setSearchTimedOut(false)
+    // Surface partial failures as a dismissible warning, not a blocking alert
+    if (Array.isArray(data.failures) && data.failures.length > 0) {
+      setScraperWarnings(data.failures)
+    }
     pollStartRef.current = Date.now()
     setSearchRunId(data.searchRunId)
   }
@@ -148,6 +163,26 @@ export default function ListingsPage() {
         </div>
       )}
 
+      {scraperWarnings.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800 flex items-start justify-between">
+          <div>
+            <p className="font-medium mb-1">Some sources failed to start:</p>
+            <ul className="list-disc list-inside space-y-0.5">
+              {scraperWarnings.map((w, i) => (
+                <li key={i} className="text-yellow-700">{w}</li>
+              ))}
+            </ul>
+            <p className="mt-1 text-yellow-600 text-xs">Results from working sources will still appear.</p>
+          </div>
+          <button
+            onClick={() => setScraperWarnings([])}
+            className="ml-4 text-yellow-500 hover:text-yellow-700 text-xs underline shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {searchTimedOut && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
           The search is taking longer than expected — the scrapers may have failed to return results. Try running a new search.
@@ -156,16 +191,32 @@ export default function ListingsPage() {
 
       {loading && <div className="text-sm text-gray-400">Loading…</div>}
 
-      {!loading && listings.length === 0 && (
+      {!loading && listings.length === 0 && !searching && (
         <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
-          <p className="text-gray-400 text-sm mb-4">No listings yet.</p>
-          <button
-            onClick={runSearch}
-            disabled={searching}
-            className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-          >
-            Run your first search
-          </button>
+          {hasSearched ? (
+            <>
+              <p className="text-gray-400 text-sm mb-1">No listings found.</p>
+              <p className="text-gray-400 text-xs mb-4">Try adjusting your neighborhoods or run another search.</p>
+              <button
+                onClick={runSearch}
+                disabled={searching}
+                className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Run search again
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-400 text-sm mb-4">No listings yet.</p>
+              <button
+                onClick={runSearch}
+                disabled={searching}
+                className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Run your first search
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -225,7 +276,7 @@ export default function ListingsPage() {
                 <div className="mt-2 flex gap-2 flex-wrap">
                   {Object.entries(ul.score_breakdown).map(([key, val]) => (
                     <span key={key} className="text-xs bg-gray-50 border border-gray-100 px-2 py-0.5 rounded text-gray-500">
-                      {key}: <strong>{val}</strong>
+                      {key}: <strong>{String(val)}</strong>
                     </span>
                   ))}
                 </div>
