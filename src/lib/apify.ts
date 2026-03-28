@@ -62,30 +62,14 @@ export async function startZillowScrape(
   webhookUrl: string,
   searchRunId: string
 ): Promise<string> {
-  // Zillow actor requires URLs with searchQueryState param — simple /homes/for_rent/city_rb/ format is rejected
-  const searchUrls = neighborhoods.map(n => {
-    const searchTerm = n.zip_code || `${n.neighborhood}, ${n.city}, ${n.state}`
-    const searchQueryState = JSON.stringify({
-      pagination: {},
-      isMapVisible: false,
-      isListVisible: true,
-      usersSearchTerm: searchTerm,
-      filterState: {
-        fr:   { value: true  },
-        fsba: { value: false },
-        fsbo: { value: false },
-        nc:   { value: false },
-        cmsn: { value: false },
-        auc:  { value: false },
-        fore: { value: false },
-      },
-    })
-    return `https://www.zillow.com/homes/for_rent/?searchQueryState=${encodeURIComponent(searchQueryState)}`
-  })
+  // actor: maxcopell/zillow-scraper
+  // Use query-based input — searchUrls with searchQueryState format is rejected by this actor
+  const first = neighborhoods[0]
+  const query = first.zip_code || `${first.neighborhood}, ${first.city}, ${first.state}`
   return startActor('maxcopell/zillow-scraper', {
-    searchUrls: searchUrls.map(url => ({ url })),
+    query,
+    searchType: 'For Rent',
     maxItems: 50,
-    type: 'rent',
   }, buildWebhooks(webhookUrl, searchRunId, 'zillow'))
 }
 
@@ -109,13 +93,16 @@ export async function startCraigslistScrape(
   webhookUrl: string,
   searchRunId: string
 ): Promise<string> {
-  const searchUrls = neighborhoods.map(n => {
+  // actor: automation-lab/craigslist-scraper
+  // Requires startUrls (array of {url} objects) — not searchQueries
+  // /search/apa is the apartments category; no need for &section=apa
+  const startUrls = neighborhoods.map(n => {
     const citySlug = n.city.toLowerCase().replace(/\s+/g, '')
     const query = encodeURIComponent(n.zip_code || `${n.neighborhood} ${n.city}`)
-    return `https://${citySlug}.craigslist.org/search/apa?query=${query}&section=apa`
+    return { url: `https://${citySlug}.craigslist.org/search/apa?query=${query}` }
   })
   return startActor('automation-lab/craigslist-scraper', {
-    startUrls: searchUrls.map(url => ({ url })),
+    startUrls,
     maxItems: 50,
   }, buildWebhooks(webhookUrl, searchRunId, 'craigslist'))
 }
