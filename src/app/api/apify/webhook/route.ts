@@ -36,12 +36,27 @@ export async function POST(req: NextRequest) {
 
   // Decrement FIRST — before any scoring — so a timeout mid-scoring never
   // leaves apify_runs_pending stuck and the run status never updating.
-  const { data: updated } = await supabase
+  const { data: updated, error: rpcError } = await supabase
     .rpc('decrement_apify_runs_pending', { run_id: searchRunId })
     .select()
     .single()
 
-  const allDone = updated && (updated as { apify_runs_pending: number }).apify_runs_pending === 0
+  let newPending: number
+  if (rpcError || !updated) {
+    // RPC function may not exist — fall back to read-modify-write
+    console.error('decrement_apify_runs_pending RPC failed, using fallback:', rpcError?.message)
+    const current = (searchRun.apify_runs_pending as number) ?? 1
+    newPending = Math.max(0, current - 1)
+    await supabase
+      .from('search_runs')
+      .update({ apify_runs_pending: newPending })
+      .eq('id', searchRunId)
+  } else {
+    newPending = (updated as { apify_runs_pending: number }).apify_runs_pending
+  }
+
+  const allDone = newPending === 0
+  console.log(`Webhook: source=${source} eventType=${eventType} pending=${newPending} allDone=${allDone}`)
 
   // Process listings on success
   if (eventType === 'ACTOR.RUN.SUCCEEDED' && defaultDatasetId) {

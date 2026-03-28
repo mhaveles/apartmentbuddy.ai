@@ -68,7 +68,7 @@ export async function startZillowScrape(
   // Use short-form filter keys (fr, fsba) — the actor parses Zillow's public URL format.
   const searchUrls = neighborhoods.map(n => {
     const geoPath = n.zip_code
-      ? `${n.zip_code}_rb`
+      ? `homes/for_rent/${n.zip_code}_rb`
       : `${n.city.toLowerCase().replace(/\s+/g, '-')}-${n.state.toLowerCase()}/rentals`
     const searchQueryState = JSON.stringify({
       pagination: {},
@@ -117,16 +117,13 @@ export async function startCraigslistScrape(
   // Requires startUrls (array of {url} objects)
   // Drop text query= — it filters to only listings containing the keyword, decimating results.
   // Use postal= for zip-scoped searches; fall back to browsing all apartments in the city.
-  // actor requires searchQueries (array of URL strings), not startUrls
-  const searchQueries = neighborhoods.map(n => {
-    const citySlug = n.city.toLowerCase().replace(/\s+/g, '')
-    const params = n.zip_code
-      ? `?postal=${n.zip_code}&search_distance=5&sort=date`
-      : `?sort=date`
-    return `https://${citySlug}.craigslist.org/search/apa${params}`
-  })
+  // actor uses city + category fields as primary inputs (searchQueries = keyword search within those)
+  // category "apa" = Craigslist's apartments/housing-for-rent section
+  const first = neighborhoods[0]
+  const city = first.city.toLowerCase().replace(/\s+/g, '')
   return startActor('automation-lab/craigslist-scraper', {
-    searchQueries,
+    city,
+    category: 'apa',
     maxItems: 50,
   }, buildWebhooks(webhookUrl, searchRunId, 'craigslist'))
 }
