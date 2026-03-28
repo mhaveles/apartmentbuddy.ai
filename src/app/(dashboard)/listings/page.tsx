@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { UserListing } from '@/types'
 
 export default function ListingsPage() {
@@ -10,6 +10,8 @@ export default function ListingsPage() {
   const [searchRunId, setSearchRunId] = useState<string | null>(null)
   const [savedOnly, setSavedOnly] = useState(false)
   const [searchStatus, setSearchStatus] = useState<string | null>(null)
+  const [searchTimedOut, setSearchTimedOut] = useState(false)
+  const pollStartRef = useRef<number | null>(null)
 
   const loadListings = useCallback(async () => {
     const res = await fetch(`/api/listings${savedOnly ? '?saved=true' : ''}`)
@@ -25,20 +27,33 @@ export default function ListingsPage() {
     async function checkRunning() {
       const res = await fetch('/api/search')
       const runs = await res.json()
-      const running = Array.isArray(runs) ? runs.find((r: { status: string; id: string }) => r.status === 'running' || r.status === 'pending') : null
+      const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+      const running = Array.isArray(runs)
+        ? runs.find((r: { status: string; id: string; started_at: string }) =>
+            (r.status === 'running' || r.status === 'pending') && r.started_at > fifteenMinAgo)
+        : null
       if (running) {
         setSearching(true)
         setSearchStatus('running')
         setSearchRunId(running.id)
+        pollStartRef.current = Date.now()
       }
     }
     checkRunning()
   }, [])
 
-  // Poll search run status
+  // Poll search run status — bail out after 10 minutes to avoid infinite spinner
   useEffect(() => {
     if (!searchRunId) return
     const interval = setInterval(async () => {
+      // Time out after 10 minutes
+      if (pollStartRef.current && Date.now() - pollStartRef.current > 10 * 60 * 1000) {
+        clearInterval(interval)
+        setSearching(false)
+        setSearchRunId(null)
+        setSearchTimedOut(true)
+        return
+      }
       const res = await fetch(`/api/search?runId=${searchRunId}`)
       const run = await res.json()
       setSearchStatus(run.status)
@@ -46,6 +61,7 @@ export default function ListingsPage() {
         clearInterval(interval)
         setSearching(false)
         setSearchRunId(null)
+        setSearchTimedOut(false)
         if (run.status === 'completed') loadListings()
       }
     }, 3000)
@@ -74,6 +90,8 @@ export default function ListingsPage() {
       setSearching(false)
       return
     }
+    setSearchTimedOut(false)
+    pollStartRef.current = Date.now()
     setSearchRunId(data.searchRunId)
   }
 
@@ -126,6 +144,12 @@ export default function ListingsPage() {
           >
             Cancel
           </button>
+        </div>
+      )}
+
+      {searchTimedOut && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+          The search is taking longer than expected — the scrapers may have failed to return results. Try running a new search.
         </div>
       )}
 
