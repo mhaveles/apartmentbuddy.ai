@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
   }
 
   const craigslistInput = {
-    startUrls: [{ url: `https://${city}.craigslist.org/search/apa?postal=${zip}&search_distance=5&sort=date` }],
+    searchQueries: [`https://${city}.craigslist.org/search/apa?postal=${zip}&search_distance=5&sort=date`],
     maxItems: 3,
   }
 

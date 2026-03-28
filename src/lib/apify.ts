@@ -117,15 +117,16 @@ export async function startCraigslistScrape(
   // Requires startUrls (array of {url} objects)
   // Drop text query= — it filters to only listings containing the keyword, decimating results.
   // Use postal= for zip-scoped searches; fall back to browsing all apartments in the city.
-  const startUrls = neighborhoods.map(n => {
+  // actor requires searchQueries (array of URL strings), not startUrls
+  const searchQueries = neighborhoods.map(n => {
     const citySlug = n.city.toLowerCase().replace(/\s+/g, '')
     const params = n.zip_code
       ? `?postal=${n.zip_code}&search_distance=5&sort=date`
       : `?sort=date`
-    return { url: `https://${citySlug}.craigslist.org/search/apa${params}` }
+    return `https://${citySlug}.craigslist.org/search/apa${params}`
   })
   return startActor('automation-lab/craigslist-scraper', {
-    startUrls,
+    searchQueries,
     maxItems: 50,
   }, buildWebhooks(webhookUrl, searchRunId, 'craigslist'))
 }
