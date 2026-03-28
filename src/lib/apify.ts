@@ -62,13 +62,17 @@ export async function startZillowScrape(
   webhookUrl: string,
   searchRunId: string
 ): Promise<string> {
-  // actor: maxcopell/zillow-scraper
-  // Use query-based input — searchUrls with searchQueryState format is rejected by this actor
-  const first = neighborhoods[0]
-  const query = first.zip_code || `${first.neighborhood}, ${first.city}, ${first.state}`
+  // actor: maxcopell/zillow-scraper — searchUrls is required
+  // Use clean /rentals/ URL format (searchQueryState format returns 0 results)
+  const searchUrls = neighborhoods.map(n => {
+    if (n.zip_code) {
+      return { url: `https://www.zillow.com/homes/for_rent/${n.zip_code}_rb/` }
+    }
+    const citySlug = `${n.city.toLowerCase().replace(/\s+/g, '-')}-${n.state.toLowerCase()}`
+    return { url: `https://www.zillow.com/${citySlug}/rentals/` }
+  })
   return startActor('maxcopell/zillow-scraper', {
-    query,
-    searchType: 'For Rent',
+    searchUrls,
     maxItems: 50,
   }, buildWebhooks(webhookUrl, searchRunId, 'zillow'))
 }
