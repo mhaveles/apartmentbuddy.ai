@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
           }
           return 0
         }))
-        scored += results.reduce((a, b) => a + b, 0)
+        scored += results.reduce((a: number, b: number) => a + b, 0)
       }
     }
 
