@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   // Fire all 4 scrapers in parallel — use allSettled so one failure doesn't kill the rest
   const [zillowResult, apartmentsResult, craigslistResult, truliaResult] = await Promise.allSettled([
-    startZillowScrape(neighborhoods, webhookUrl, searchRun.id),
+    startZillowScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
     startApartmentsComScrape(neighborhoods, webhookUrl, searchRun.id),
     startCraigslistScrape(neighborhoods, webhookUrl, searchRun.id),
     startTruliaScrape(neighborhoods, webhookUrl, searchRun.id),

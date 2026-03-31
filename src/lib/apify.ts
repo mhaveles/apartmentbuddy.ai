@@ -26,7 +26,8 @@ export interface ScrapedListing {
   images: string[]
 }
 
-type Neighborhood = Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null }>
+type MapBounds = { north: number; south: number; east: number; west: number }
+type Neighborhood = Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null; map_bounds?: MapBounds | null }>
 
 function buildWebhooks(webhookUrl: string, searchRunId: string, source: string) {
   return [{
@@ -60,31 +61,55 @@ async function startActor(actorId: string, input: unknown, webhooks: unknown[]):
 export async function startZillowScrape(
   neighborhoods: Neighborhood,
   webhookUrl: string,
-  searchRunId: string
+  searchRunId: string,
+  preferences?: { max_rent?: number | null; min_bedrooms?: number | null; min_bathrooms?: number | null }
 ): Promise<string> {
   // actor: maxcopell/zillow-scraper — requires searchUrls with ?searchQueryState= in the URL
   // The geographic identifier MUST be in the URL path (e.g. /80218_rb/ or /denver-co/rentals/)
   // so Zillow scopes the search to that area. Without it, 0 results.
-  // Use short-form filter keys (fr, fsba) — the actor parses Zillow's public URL format.
+  // Use short-form filter keys (fr, fsba, beds, baths, mp) — the actor parses Zillow's public URL format.
+  // mp = monthly payment (dollars), max_rent stored in cents so divide by 100.
   const searchUrls = neighborhoods.map(n => {
-    const geoPath = n.zip_code
-      ? `homes/for_rent/${n.zip_code}_rb`
-      : `${n.city.toLowerCase().replace(/\s+/g, '-')}-${n.state.toLowerCase()}/rentals`
-    const searchQueryState = JSON.stringify({
-      pagination: {},
-      isMapVisible: false,
-      isListVisible: true,
-      filterState: {
-        fr:   { value: true  },
-        fsba: { value: false },
-        fsbo: { value: false },
-        nc:   { value: false },
-        cmsn: { value: false },
-        auc:  { value: false },
-        fore: { value: false },
-      },
-    })
-    return { url: `https://www.zillow.com/${geoPath}/?searchQueryState=${encodeURIComponent(searchQueryState)}` }
+    const filterState: Record<string, unknown> = {
+      fr:   { value: true  },
+      fsba: { value: false },
+      fsbo: { value: false },
+      nc:   { value: false },
+      cmsn: { value: false },
+      auc:  { value: false },
+      fore: { value: false },
+    }
+    if (preferences?.min_bedrooms) filterState.beds = { min: preferences.min_bedrooms }
+    if (preferences?.min_bathrooms) filterState.baths = { min: preferences.min_bathrooms }
+    if (preferences?.max_rent) filterState.mp = { max: Math.round(preferences.max_rent / 100) }
+
+    let urlBase: string
+    let searchQueryStateObj: Record<string, unknown>
+
+    if (n.map_bounds) {
+      // Preferred: use mapBounds (from user drawing their area) — what Zillow natively generates
+      urlBase = 'https://www.zillow.com/homes/for_rent/'
+      searchQueryStateObj = {
+        isMapVisible: true,
+        mapBounds: n.map_bounds,
+        filterState,
+        isListVisible: true,
+      }
+    } else {
+      // Fallback: zip-based geo path when no bounds stored
+      const geoPath = n.zip_code
+        ? `homes/for_rent/${n.zip_code}_rb`
+        : `${n.city.toLowerCase().replace(/\s+/g, '-')}-${n.state.toLowerCase()}/rentals`
+      urlBase = `https://www.zillow.com/${geoPath}/`
+      searchQueryStateObj = {
+        pagination: {},
+        isMapVisible: false,
+        isListVisible: true,
+        filterState,
+      }
+    }
+
+    return { url: `${urlBase}?searchQueryState=${encodeURIComponent(JSON.stringify(searchQueryStateObj))}` }
   })
   return startActor('maxcopell/zillow-scraper', {
     searchUrls,
