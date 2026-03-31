@@ -61,11 +61,14 @@ function buildWebhooks(webhookUrl: string, searchRunId: string, source: string) 
 }
 
 async function startActor(actorId: string, input: unknown, webhooks: unknown[]): Promise<string> {
-  const url = `${APIFY_BASE}/acts/${encodeURIComponent(actorId)}/runs?token=${token()}`
+  // Apify requires webhooks as a base64-encoded query param, NOT in the request body.
+  // Putting them in the body passes them as actor input and Apify ignores them entirely.
+  const webhooksParam = Buffer.from(JSON.stringify(webhooks)).toString('base64')
+  const url = `${APIFY_BASE}/acts/${encodeURIComponent(actorId)}/runs?token=${token()}&webhooks=${webhooksParam}`
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...input as object, webhooks }),
+    body: JSON.stringify(input),
   })
   if (!res.ok) {
     const text = await res.text()
