@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { startZillowScrape, startApartmentsComScrape, startCraigslistScrape, startTruliaScrape } from '@/lib/apify'
+import { startZillowScrape /*, startApartmentsComScrape, startCraigslistScrape, startTruliaScrape */ } from '@/lib/apify'
 import { FREE_SEARCH_LIMIT } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       neighborhoods: neighborhoods.map(n => `${n.neighborhood}, ${n.city}, ${n.state}`),
       status: 'running',
-      apify_runs_pending: 4,
+      apify_runs_pending: 1,
       started_at: new Date().toISOString(),
     })
     .select()
@@ -84,29 +84,22 @@ export async function POST(req: NextRequest) {
 
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/apify/webhook?secret=${process.env.CRON_SECRET}`
 
-  // Fire all 4 scrapers in parallel — use allSettled so one failure doesn't kill the rest
-  const [zillowResult, apartmentsResult, craigslistResult, truliaResult] = await Promise.allSettled([
+  // Zillow only for now — add craigslist, apartments_com, trulia once core flow is stable
+  const [zillowResult] = await Promise.allSettled([
     startZillowScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
-    startApartmentsComScrape(neighborhoods, webhookUrl, searchRun.id),
-    startCraigslistScrape(neighborhoods, webhookUrl, searchRun.id),
-    startTruliaScrape(neighborhoods, webhookUrl, searchRun.id),
+    // startCraigslistScrape(neighborhoods, webhookUrl, searchRun.id),
+    // startApartmentsComScrape(neighborhoods, webhookUrl, searchRun.id),
+    // startTruliaScrape(neighborhoods, webhookUrl, searchRun.id),
   ])
 
   const runIds = {
-    zillow:         zillowResult.status     === 'fulfilled' ? zillowResult.value     : null,
-    apartments_com: apartmentsResult.status === 'fulfilled' ? apartmentsResult.value : null,
-    craigslist:     craigslistResult.status === 'fulfilled' ? craigslistResult.value : null,
-    trulia:         truliaResult.status     === 'fulfilled' ? truliaResult.value     : null,
+    zillow: zillowResult.status === 'fulfilled' ? zillowResult.value : null,
   }
 
   const successfulStarts = Object.values(runIds).filter(Boolean).length
 
-  // Log any failures for debugging — extract .message so Error objects serialize correctly
   const failures = [
-    zillowResult.status     === 'rejected' ? `zillow: ${(zillowResult.reason as Error).message}`         : null,
-    apartmentsResult.status === 'rejected' ? `apartments_com: ${(apartmentsResult.reason as Error).message}` : null,
-    craigslistResult.status === 'rejected' ? `craigslist: ${(craigslistResult.reason as Error).message}`  : null,
-    truliaResult.status     === 'rejected' ? `trulia: ${(truliaResult.reason as Error).message}`          : null,
+    zillowResult.status === 'rejected' ? `zillow: ${(zillowResult.reason as Error).message}` : null,
   ].filter(Boolean) as string[]
 
   if (failures.length > 0) {

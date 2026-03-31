@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
 
     const listings = await fetchScrapedListings(defaultDatasetId, source)
 
-    let scored = 0
-
+    // Phase 1: Save all listings to DB (fast, no AI)
+    const savedListings: Array<{ id: string; listing: typeof listings[number] }> = []
     for (const listing of listings) {
       const { data: savedListing } = await supabase
         .from('listings')
@@ -96,55 +96,65 @@ export async function POST(req: NextRequest) {
         .select()
         .single()
 
-      if (!savedListing) continue
+      if (savedListing) savedListings.push({ id: savedListing.id, listing })
+    }
 
-      // Skip if already scored for this user
-      const { data: existing } = await supabase
-        .from('user_listings')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('listing_id', savedListing.id)
-        .single()
+    // Phase 2: Score all listings in parallel batches of 5
+    // Sequential scoring times out on Vercel (60s limit); batching keeps it ~30s for 300+ listings
+    let scored = 0
+    if (preferences) {
+      const CONCURRENCY = 5
+      for (let i = 0; i < savedListings.length; i += CONCURRENCY) {
+        const batch = savedListings.slice(i, i + CONCURRENCY)
+        const results = await Promise.all(batch.map(async ({ id: listingId, listing }) => {
+          // Skip if already scored for this user
+          const { data: existing } = await supabase
+            .from('user_listings')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('listing_id', listingId)
+            .single()
+          if (existing) return 0
 
-      if (existing) continue
-
-      if (preferences) {
-        try {
-          const scoreResponse = await anthropic.messages.create({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 512,
-            system: SCORING_PROMPT,
-            messages: [{
-              role: 'user',
-              content: `User preferences:\n${JSON.stringify(preferences, null, 2)}\n\nListing:\n${JSON.stringify({
-                rent: listing.rent / 100,
-                bedrooms: listing.bedrooms,
-                bathrooms: listing.bathrooms,
-                sqft: listing.sqft,
-                amenities: listing.amenities,
-                neighborhood: listing.neighborhood,
-                city: listing.city,
-                description: listing.description,
-              }, null, 2)}`,
-            }],
-          })
-
-          const scoreText = scoreResponse.content[0].type === 'text' ? scoreResponse.content[0].text : '{}'
-          const jsonMatch = scoreText.match(/\{[\s\S]*\}/)
-          if (jsonMatch) {
-            const scoreData = JSON.parse(jsonMatch[0])
-            await supabase.from('user_listings').insert({
-              user_id: userId,
-              listing_id: savedListing.id,
-              score: scoreData.score,
-              score_breakdown: scoreData.breakdown,
-              score_reasoning: scoreData.reasoning,
+          try {
+            const scoreResponse = await anthropic.messages.create({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 512,
+              system: SCORING_PROMPT,
+              messages: [{
+                role: 'user',
+                content: `User preferences:\n${JSON.stringify(preferences, null, 2)}\n\nListing:\n${JSON.stringify({
+                  rent: listing.rent / 100,
+                  bedrooms: listing.bedrooms,
+                  bathrooms: listing.bathrooms,
+                  sqft: listing.sqft,
+                  amenities: listing.amenities,
+                  neighborhood: listing.neighborhood,
+                  city: listing.city,
+                  description: listing.description,
+                }, null, 2)}`,
+              }],
             })
-            scored++
+
+            const scoreText = scoreResponse.content[0].type === 'text' ? scoreResponse.content[0].text : '{}'
+            const jsonMatch = scoreText.match(/\{[\s\S]*\}/)
+            if (jsonMatch) {
+              const scoreData = JSON.parse(jsonMatch[0])
+              await supabase.from('user_listings').insert({
+                user_id: userId,
+                listing_id: listingId,
+                score: scoreData.score,
+                score_breakdown: scoreData.breakdown,
+                score_reasoning: scoreData.reasoning,
+              })
+              return 1
+            }
+          } catch (err) {
+            console.error('Scoring error:', err)
           }
-        } catch (err) {
-          console.error('Scoring error:', err)
-        }
+          return 0
+        }))
+        scored += results.reduce((a, b) => a + b, 0)
       }
     }
 
