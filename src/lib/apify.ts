@@ -29,6 +29,23 @@ export interface ScrapedListing {
 type MapBounds = { north: number; south: number; east: number; west: number }
 type Neighborhood = Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null; map_bounds?: MapBounds | null }>
 
+export async function geocodeZip(zip: string): Promise<MapBounds | null> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zip)}&countrycodes=us&format=json&limit=1`,
+      { headers: { 'User-Agent': 'ApartmentBuddy/1.0 (contact@apartmentbuddy.ai)' } }
+    )
+    if (!res.ok) return null
+    const data: Array<{ boundingbox?: string[] }> = await res.json()
+    if (!data[0]?.boundingbox) return null
+    // boundingbox is [south, north, west, east]
+    const [south, north, west, east] = data[0].boundingbox.map(Number)
+    return { north, south, east, west }
+  } catch {
+    return null
+  }
+}
+
 function buildWebhooks(webhookUrl: string, searchRunId: string, source: string) {
   return [{
     eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED'],
@@ -69,7 +86,12 @@ export async function startZillowScrape(
   // so Zillow scopes the search to that area. Without it, 0 results.
   // Use short-form filter keys (fr, fsba, beds, baths, mp) — the actor parses Zillow's public URL format.
   // mp = monthly payment (dollars), max_rent stored in cents so divide by 100.
-  const searchUrls = neighborhoods.map(n => {
+  // Geocode any neighborhoods that don't have stored bounds yet
+  const boundsMap = await Promise.all(
+    neighborhoods.map(async n => n.map_bounds ?? (n.zip_code ? await geocodeZip(n.zip_code) : null))
+  )
+
+  const searchUrls = neighborhoods.map((n, i) => {
     const filterState: Record<string, unknown> = {
       fr:   { value: true  },
       fsba: { value: false },
@@ -83,33 +105,17 @@ export async function startZillowScrape(
     if (preferences?.min_bathrooms) filterState.baths = { min: preferences.min_bathrooms }
     if (preferences?.max_rent) filterState.mp = { max: Math.round(preferences.max_rent / 100) }
 
-    let urlBase: string
-    let searchQueryStateObj: Record<string, unknown>
-
-    if (n.map_bounds) {
-      // Preferred: use mapBounds (from user drawing their area) — what Zillow natively generates
-      urlBase = 'https://www.zillow.com/homes/for_rent/'
-      searchQueryStateObj = {
-        isMapVisible: true,
-        mapBounds: n.map_bounds,
-        filterState,
-        isListVisible: true,
-      }
-    } else {
-      // Fallback: zip-based geo path when no bounds stored
-      const geoPath = n.zip_code
-        ? `homes/for_rent/${n.zip_code}_rb`
-        : `${n.city.toLowerCase().replace(/\s+/g, '-')}-${n.state.toLowerCase()}/rentals`
-      urlBase = `https://www.zillow.com/${geoPath}/`
-      searchQueryStateObj = {
-        pagination: {},
-        isMapVisible: false,
-        isListVisible: true,
-        filterState,
-      }
+    const bounds = boundsMap[i]
+    const searchQueryStateObj: Record<string, unknown> = {
+      isMapVisible: true,
+      isListVisible: true,
+      filterState,
+    }
+    if (bounds) {
+      searchQueryStateObj.mapBounds = bounds
     }
 
-    return { url: `${urlBase}?searchQueryState=${encodeURIComponent(JSON.stringify(searchQueryStateObj))}` }
+    return { url: `https://www.zillow.com/homes/for_rent/?searchQueryState=${encodeURIComponent(JSON.stringify(searchQueryStateObj))}` }
   })
   return startActor('maxcopell/zillow-scraper', {
     searchUrls,

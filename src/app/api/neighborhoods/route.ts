@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { geocodeZip } from '@/lib/apify'
 
 export async function GET() {
   const supabase = await createClient()
@@ -27,9 +28,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'city, state, and neighborhood are required' }, { status: 400 })
   }
 
+  const map_bounds = zip_code ? await geocodeZip(zip_code) : null
+
   const { data, error } = await supabase
     .from('monitored_neighborhoods')
-    .insert({ user_id: user.id, city, state, neighborhood, zip_code: zip_code || null })
+    .insert({ user_id: user.id, city, state, neighborhood, zip_code: zip_code || null, map_bounds })
     .select()
     .single()
 
