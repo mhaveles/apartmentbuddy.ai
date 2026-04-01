@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { searchRunId, source, eventType, defaultDatasetId } = body
 
+  console.log('WEBHOOK RECEIVED:', JSON.stringify({ searchRunId, source, eventType, defaultDatasetId }))
+
   if (!searchRunId || !source) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
