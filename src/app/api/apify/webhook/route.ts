@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { fetchScrapedListings } from '@/lib/apify'
+import { fetchScrapedListingsByRunId } from '@/lib/apify'
 import { anthropic, SCORING_PROMPT } from '@/lib/anthropic'
 
 export const maxDuration = 60
@@ -13,9 +13,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { searchRunId, source, eventType, defaultDatasetId } = body
+  const { searchRunId, source, eventType, defaultDatasetId, actorRunId } = body
 
-  console.log('WEBHOOK RECEIVED:', JSON.stringify({ searchRunId, source, eventType, defaultDatasetId }))
+  console.log('WEBHOOK RECEIVED:', JSON.stringify({ searchRunId, source, eventType, defaultDatasetId, actorRunId }))
 
   if (!searchRunId || !source) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -61,17 +61,24 @@ export async function POST(req: NextRequest) {
   }
 
   const allDone = newPending === 0
-  console.log(`Webhook: source=${source} eventType=${eventType} pending=${newPending} allDone=${allDone}`)
 
-  // Process listings on success
-  if (eventType === 'ACTOR.RUN.SUCCEEDED' && defaultDatasetId) {
+  // Resolve the Apify run ID to fetch data with.
+  // We use the run ID stored in our DB at actor-start time — this is more reliable than
+  // depending on Apify's {{resource.id}} template variable being interpolated in the payload.
+  const storedRunId = (searchRun.apify_run_ids as Record<string, string> | null)?.[source]
+  const resolvedRunId = storedRunId || actorRunId  // actorRunId from payload as fallback
+  console.log(`Webhook: source=${source} eventType=${eventType} resolvedRunId=${resolvedRunId} pending=${newPending} allDone=${allDone}`)
+
+  // Process listings — run whenever we have a run ID (Apify webhook already filters by event type)
+  if (resolvedRunId) {
     const { data: preferences } = await supabase
       .from('preferences')
       .select('*')
       .eq('user_id', userId)
       .single()
 
-    const listings = await fetchScrapedListings(defaultDatasetId, source)
+    const listings = await fetchScrapedListingsByRunId(resolvedRunId, source)
+    console.log(`Fetched ${listings.length} listings for run ${resolvedRunId}`)
 
     // Phase 1: Save all listings to DB (fast, no AI)
     const savedListings: Array<{ id: string; listing: typeof listings[number] }> = []

@@ -185,14 +185,17 @@ export async function startTruliaScrape(
   }, buildWebhooks(webhookUrl, searchRunId, 'trulia'))
 }
 
-export async function fetchScrapedListings(
-  datasetId: string,
+export async function fetchScrapedListingsByRunId(
+  runId: string,
   source: string
 ): Promise<ScrapedListing[]> {
-  const res = await fetch(`${APIFY_BASE}/datasets/${datasetId}/items?token=${token()}&clean=true`)
-  if (!res.ok) throw new Error(`Failed to fetch dataset ${datasetId}: ${res.status}`)
+  const res = await fetch(`${APIFY_BASE}/actor-runs/${runId}/dataset/items?token=${token()}&clean=true`)
+  if (!res.ok) throw new Error(`Failed to fetch dataset for run ${runId}: ${res.status}`)
   const items: Record<string, unknown>[] = await res.json()
+  return mapListings(items, source)
+}
 
+function mapListings(items: Record<string, unknown>[], source: string): ScrapedListing[] {
   if (source === 'zillow') {
     return items.map(item => ({
       externalId: String(item.zpid || item.id || Math.random()),
@@ -282,4 +285,14 @@ export async function fetchScrapedListings(
   }
 
   return []
+}
+
+export async function fetchScrapedListings(
+  datasetId: string,
+  source: string
+): Promise<ScrapedListing[]> {
+  const res = await fetch(`${APIFY_BASE}/datasets/${datasetId}/items?token=${token()}&clean=true`)
+  if (!res.ok) throw new Error(`Failed to fetch dataset ${datasetId}: ${res.status}`)
+  const items: Record<string, unknown>[] = await res.json()
+  return mapListings(items, source)
 }
