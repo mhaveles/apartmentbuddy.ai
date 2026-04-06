@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchScrapedListingsByRunId } from '@/lib/apify'
 import { anthropic, SCORING_PROMPT } from '@/lib/anthropic'
@@ -69,7 +70,6 @@ export async function POST(req: NextRequest) {
   const resolvedRunId = storedRunId || actorRunId  // actorRunId from payload as fallback
   console.log(`Webhook: source=${source} eventType=${eventType} resolvedRunId=${resolvedRunId} pending=${newPending} allDone=${allDone}`)
 
-  // Process listings — run whenever we have a run ID (Apify webhook already filters by event type)
   if (resolvedRunId) {
     const { data: preferences } = await supabase
       .from('preferences')
@@ -111,77 +111,82 @@ export async function POST(req: NextRequest) {
       if (savedListing) savedListings.push({ id: savedListing.id, listing })
     }
 
-    // Phase 2: Score all listings in parallel batches of 5
-    // Sequential scoring times out on Vercel (60s limit); batching keeps it ~30s for 300+ listings
-    let scored = 0
-    if (preferences) {
-      const CONCURRENCY = 5
-      for (let i = 0; i < savedListings.length; i += CONCURRENCY) {
-        const batch = savedListings.slice(i, i + CONCURRENCY)
-        const results = await Promise.all(batch.map(async ({ id: listingId, listing }) => {
-          // Skip if already scored for this user
-          const { data: existing } = await supabase
-            .from('user_listings')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('listing_id', listingId)
-            .single()
-          if (existing) return 0
-
-          try {
-            const scoreResponse = await anthropic.messages.create({
-              model: 'claude-haiku-4-5-20251001',
-              max_tokens: 512,
-              system: SCORING_PROMPT,
-              messages: [{
-                role: 'user',
-                content: `User preferences:\n${JSON.stringify(preferences, null, 2)}\n\nListing:\n${JSON.stringify({
-                  rent: listing.rent / 100,
-                  bedrooms: listing.bedrooms,
-                  bathrooms: listing.bathrooms,
-                  sqft: listing.sqft,
-                  amenities: listing.amenities,
-                  neighborhood: listing.neighborhood,
-                  city: listing.city,
-                  description: listing.description,
-                }, null, 2)}`,
-              }],
-            })
-
-            const scoreText = scoreResponse.content[0].type === 'text' ? scoreResponse.content[0].text : '{}'
-            const jsonMatch = scoreText.match(/\{[\s\S]*\}/)
-            if (jsonMatch) {
-              const scoreData = JSON.parse(jsonMatch[0])
-              await supabase.from('user_listings').insert({
-                user_id: userId,
-                listing_id: listingId,
-                score: scoreData.score,
-                score_breakdown: scoreData.breakdown,
-                score_reasoning: scoreData.reasoning,
-              })
-              return 1
-            }
-          } catch (err) {
-            console.error('Scoring error:', err)
-          }
-          return 0
-        }))
-        scored += results.reduce((a: number, b: number) => a + b, 0)
-      }
-    }
-
+    // Update listings_found now so the run count is correct even if scoring is cut short
     await supabase
       .from('search_runs')
-      .update({
-        listings_found: (searchRun.listings_found || 0) + listings.length,
-        listings_scored: (searchRun.listings_scored || 0) + scored,
-      })
+      .update({ listings_found: (searchRun.listings_found || 0) + listings.length })
       .eq('id', searchRunId)
+
+    // Phase 2: Score in background AFTER response is sent (avoids Apify webhook timeout)
+    // after() runs post-response within the same Vercel function invocation
+    if (preferences && savedListings.length > 0) {
+      after(async () => {
+        const CONCURRENCY = 5
+        let scored = 0
+        for (let i = 0; i < savedListings.length; i += CONCURRENCY) {
+          const batch = savedListings.slice(i, i + CONCURRENCY)
+          const results = await Promise.all(batch.map(async ({ id: listingId, listing }) => {
+            // Skip if already scored for this user
+            const { data: existing } = await supabase
+              .from('user_listings')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('listing_id', listingId)
+              .single()
+            if (existing) return 0
+
+            try {
+              const scoreResponse = await anthropic.messages.create({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 512,
+                system: SCORING_PROMPT,
+                messages: [{
+                  role: 'user',
+                  content: `User preferences:\n${JSON.stringify(preferences, null, 2)}\n\nListing:\n${JSON.stringify({
+                    rent: listing.rent / 100,
+                    bedrooms: listing.bedrooms,
+                    bathrooms: listing.bathrooms,
+                    sqft: listing.sqft,
+                    amenities: listing.amenities,
+                    neighborhood: listing.neighborhood,
+                    city: listing.city,
+                    description: listing.description,
+                  }, null, 2)}`,
+                }],
+              })
+
+              const scoreText = scoreResponse.content[0].type === 'text' ? scoreResponse.content[0].text : '{}'
+              const jsonMatch = scoreText.match(/\{[\s\S]*\}/)
+              if (jsonMatch) {
+                const scoreData = JSON.parse(jsonMatch[0])
+                await supabase.from('user_listings').insert({
+                  user_id: userId,
+                  listing_id: listingId,
+                  score: scoreData.score,
+                  score_breakdown: scoreData.breakdown,
+                  score_reasoning: scoreData.reasoning,
+                })
+                return 1
+              }
+            } catch (err) {
+              console.error('Scoring error:', err)
+            }
+            return 0
+          }))
+          scored += results.reduce((a: number, b: number) => a + b, 0)
+        }
+
+        await supabase
+          .from('search_runs')
+          .update({ listings_scored: (searchRun.listings_scored || 0) + scored })
+          .eq('id', searchRunId)
+
+        console.log(`Scored ${scored} listings for run ${resolvedRunId}`)
+      })
+    }
   }
 
   // Mark completed/failed once all actors have reported back.
-  // Only mark 'failed' if zero listings found AND the last event was a failure —
-  // partial results (some actors succeeded) should still be 'completed'.
   if (allDone) {
     const { data: finalRun } = await supabase
       .from('search_runs')
@@ -196,5 +201,6 @@ export async function POST(req: NextRequest) {
       .eq('id', searchRunId)
   }
 
+  // Return 200 immediately — scoring runs in background via after()
   return NextResponse.json({ ok: true })
 }
