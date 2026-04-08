@@ -148,25 +148,22 @@ export async function startCraigslistScrape(
   searchRunId: string
 ): Promise<string> {
   // actor: automation-lab/craigslist-scraper
-  // Requires startUrls (array of {url} objects)
-  // Drop text query= — it filters to only listings containing the keyword, decimating results.
-  // Use postal= for zip-scoped searches; fall back to browsing all apartments in the city.
-  // actor requires searchQueries (won't start without it), but also uses city + category
-  // to determine WHERE to search. Pass all three so our city/category override the defaults.
-  const searchQueries = neighborhoods.map(n => {
-    const citySlug = n.city.toLowerCase().replace(/\s+/g, '')
-    const params = n.zip_code
-      ? `?postal=${n.zip_code}&search_distance=5&sort=date`
-      : `?sort=date`
-    return `https://${citySlug}.craigslist.org/search/apa${params}`
-  })
+  // searchQueries = text queries (not URLs). Each query is searched independently.
+  // includeDetails: true follows each listing URL to get full description, price, images.
   const first = neighborhoods[0]
-  const city = first.city.toLowerCase().replace(/\s+/g, '')
+  const searchQueries = neighborhoods.map(n => {
+    const parts = ['apartment for rent']
+    if (n.neighborhood) parts.push(n.neighborhood)
+    if (n.zip_code) parts.push(n.zip_code)
+    if (n.city) parts.push(n.city)
+    return parts.join(', ')
+  })
   return startActor('automation-lab/craigslist-scraper', {
+    category: 'housing',
+    city: first.city,
+    includeDetails: true,
+    maxResults: 50,
     searchQueries,
-    city,
-    category: 'apa',
-    maxItems: 50,
   }, buildWebhooks(webhookUrl, searchRunId, 'craigslist'))
 }
 
@@ -251,7 +248,8 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
       state: String(item.state || ''),
       neighborhood: item.neighborhood ? String(item.neighborhood) : null,
       zipCode: item.zipCode ? String(item.zipCode) : null,
-      rent: Math.round((Number(item.price) || 0) * 100),
+      // price is a formatted string like "$1,450" — strip non-numeric chars before parsing
+      rent: Math.round((parseFloat(String(item.price || '0').replace(/[^0-9.]/g, '')) || 0) * 100),
       bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
       bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
       sqft: item.sqft ? Number(item.sqft) : null,
