@@ -122,9 +122,10 @@ export async function POST(req: NextRequest) {
     if (preferences && savedListings.length > 0) {
       after(async () => {
         const CONCURRENCY = 5
+        const toScore = savedListings.slice(0, 50) // cap at 50 to stay within 60s Vercel limit
         let scored = 0
-        for (let i = 0; i < savedListings.length; i += CONCURRENCY) {
-          const batch = savedListings.slice(i, i + CONCURRENCY)
+        for (let i = 0; i < toScore.length; i += CONCURRENCY) {
+          const batch = toScore.slice(i, i + CONCURRENCY)
           const results = await Promise.all(batch.map(async ({ id: listingId, listing }) => {
             // Skip if already scored for this user
             const { data: existing } = await supabase
@@ -155,7 +156,9 @@ export async function POST(req: NextRequest) {
                 }],
               })
 
-              const scoreText = scoreResponse.content[0].type === 'text' ? scoreResponse.content[0].text : '{}'
+              const rawText = scoreResponse.content[0].type === 'text' ? scoreResponse.content[0].text : '{}'
+              // Strip markdown code fences (```json...``` or ```...```) before extracting JSON
+              const scoreText = rawText.replace(/```(?:json)?\s*/g, '').replace(/```/g, '')
               const jsonMatch = scoreText.match(/\{[\s\S]*\}/)
               if (jsonMatch) {
                 const scoreData = JSON.parse(jsonMatch[0])

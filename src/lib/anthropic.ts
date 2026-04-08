@@ -59,4 +59,6 @@ Return a JSON object with:
   "reasoning": "<2-3 sentence explanation of the score, highlighting the best matches and any concerns>"
 }
 
-Be honest. A listing that misses a deal-breaker should score below 30.`
+Be honest. A listing that misses a deal-breaker should score below 30.
+
+Respond with ONLY the JSON object. No explanation, no markdown, no code fences.`
