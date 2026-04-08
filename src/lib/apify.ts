@@ -142,24 +142,61 @@ export async function startApartmentsComScrape(
   }, buildWebhooks(webhookUrl, searchRunId, 'apartments_com'))
 }
 
+function buildCraigslistUrl(
+  n: { city: string; state: string; neighborhood: string; zip_code?: string | null; map_bounds?: MapBounds | null },
+  preferences?: { max_rent?: number | null; min_bedrooms?: number | null; max_bedrooms?: number | null; pet_friendly?: boolean | null }
+): string {
+  // Build a full Craigslist search URL using their native filter parameters.
+  // This mirrors exactly what a user would do manually — geographic radius, bedroom range, pets, price.
+  const cityDomain = n.city.toLowerCase().replace(/\s+/g, '')
+  const citySlug = `${n.city.toLowerCase().replace(/\s+/g, '-')}-${n.state.toLowerCase()}`
+  const base = `https://${cityDomain}.craigslist.org/search/${citySlug}/apa`
+
+  const params = new URLSearchParams()
+
+  // Geographic targeting: derive lat/lon from map_bounds center
+  if (n.map_bounds) {
+    params.set('lat', ((n.map_bounds.north + n.map_bounds.south) / 2).toFixed(4))
+    params.set('lon', ((n.map_bounds.east + n.map_bounds.west) / 2).toFixed(4))
+    params.set('search_distance', '0.5')  // 0.5 mile radius — tight neighborhood scope
+  }
+
+  // Bedroom range from preferences
+  if (preferences?.min_bedrooms != null) {
+    params.set('min_bedrooms', String(preferences.min_bedrooms))
+  }
+  if (preferences?.max_bedrooms != null) {
+    params.set('max_bedrooms', String(preferences.max_bedrooms))
+  } else if (preferences?.min_bedrooms != null) {
+    params.set('max_bedrooms', String(preferences.min_bedrooms + 1))  // default: min and one size up
+  }
+
+  // Price ceiling (max_rent stored in cents → convert to dollars)
+  if (preferences?.max_rent) {
+    params.set('max_price', String(Math.round(preferences.max_rent / 100)))
+  }
+
+  // Pet policy
+  if (preferences?.pet_friendly) {
+    params.set('pets_dog', '1')
+    params.set('pets_cat', '1')
+  }
+
+  params.set('sort', 'date')
+  return `${base}?${params.toString()}`
+}
+
 export async function startCraigslistScrape(
   neighborhoods: Neighborhood,
   webhookUrl: string,
   searchRunId: string,
-  preferences?: { max_rent?: number | null; min_bedrooms?: number | null }
+  preferences?: { max_rent?: number | null; min_bedrooms?: number | null; max_bedrooms?: number | null; pet_friendly?: boolean | null }
 ): Promise<string> {
-  // actor: automation-lab/craigslist-scraper
-  // Each string in searchQueries is a separate keyword search run independently on the city's Craigslist.
-  // The actor's `city` param scopes to the right Craigslist domain (denver.craigslist.org),
-  // so zip codes in query text are counterproductive — zip rarely appears in listing body text.
-  // "apartment" is a broad net; neighborhood name filters to location-mentioned listings.
-  // Preferences don't map to query text — "1br" as a text query matches almost nothing.
-  // Instead, low-scoring results are filtered by Claude during scoring.
+  // Pass constructed search URLs as searchQueries so the actor navigates to pre-filtered results
+  // rather than doing keyword text search. This gives us Craigslist's native geographic, bedroom,
+  // price, and pet filters — the same way a user would search manually.
   const first = neighborhoods[0]
-  const searchQueries: string[] = ['apartment']
-  for (const n of neighborhoods) {
-    if (n.neighborhood) searchQueries.push(n.neighborhood)
-  }
+  const searchQueries = neighborhoods.map(n => buildCraigslistUrl(n, preferences))
   return startActor('automation-lab/craigslist-scraper', {
     category: 'housing',
     city: first.city,
