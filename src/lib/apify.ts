@@ -192,24 +192,17 @@ export async function startCraigslistScrape(
   searchRunId: string,
   preferences?: { max_rent?: number | null; min_bedrooms?: number | null; max_bedrooms?: number | null; pet_friendly?: boolean | null }
 ): Promise<string> {
-  // searchQueries = text queries only (actor does not support URL navigation).
-  // Use the actor's own example format: ["apartment", "neighborhood, city, zip", "for rent"]
-  // Each query runs independently on the city's Craigslist; results are merged.
-  // Native filters (bedrooms, price, pets) are not available via text query —
-  // Claude scoring handles filtering at evaluation time.
+  // Use a single broad text query to capture as many listings as possible from the city.
+  // The actor's text search can't apply geographic or structured filters — those are Craigslist
+  // URL params the actor doesn't support. Instead: cast the widest net, let Claude scoring
+  // handle filtering by location, price, bedrooms, and preferences.
   const first = neighborhoods[0]
-  const searchQueries: string[] = ['apartment']
-  for (const n of neighborhoods) {
-    const locationParts = [n.neighborhood, n.city, n.zip_code].filter(Boolean)
-    if (locationParts.length) searchQueries.push(locationParts.join(', '))
-  }
-  searchQueries.push('for rent')
   return startActor('automation-lab/craigslist-scraper', {
     category: 'housing',
     city: first.city,
     includeDetails: true,
-    maxResults: 50,
-    searchQueries,
+    maxResults: 100,
+    searchQueries: ['apartment'],
   }, buildWebhooks(webhookUrl, searchRunId, 'craigslist'))
 }
 
