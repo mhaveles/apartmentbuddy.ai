@@ -149,27 +149,17 @@ export async function startCraigslistScrape(
   preferences?: { max_rent?: number | null; min_bedrooms?: number | null }
 ): Promise<string> {
   // actor: automation-lab/craigslist-scraper
-  // searchQueries = text queries searched on the city's Craigslist.
-  // Craigslist understands "1br", "2br" bedroom syntax natively.
-  // Use zip_code as primary location (most precise), fall back to neighborhood + city.
-  // includeDetails: true follows each listing URL to get full description, price, images.
+  // Each string in searchQueries is a separate keyword search run independently on the city's Craigslist.
+  // The actor's `city` param scopes to the right Craigslist domain (denver.craigslist.org),
+  // so zip codes in query text are counterproductive — zip rarely appears in listing body text.
+  // "apartment" is a broad net; neighborhood name filters to location-mentioned listings.
+  // Preferences don't map to query text — "1br" as a text query matches almost nothing.
+  // Instead, low-scoring results are filtered by Claude during scoring.
   const first = neighborhoods[0]
-  const searchQueries = neighborhoods.map(n => {
-    const parts: string[] = []
-    // Bedroom preference narrows results the same way Zillow's filterState does
-    if (preferences?.min_bedrooms) {
-      parts.push(`${preferences.min_bedrooms}br`)
-    }
-    // Zip is most precise; fall back to neighborhood then city
-    if (n.zip_code) {
-      parts.push(n.zip_code)
-    } else if (n.neighborhood) {
-      parts.push(`${n.neighborhood} ${n.city}`)
-    } else {
-      parts.push(n.city)
-    }
-    return parts.join(' ')
-  })
+  const searchQueries: string[] = ['apartment']
+  for (const n of neighborhoods) {
+    if (n.neighborhood) searchQueries.push(n.neighborhood)
+  }
   return startActor('automation-lab/craigslist-scraper', {
     category: 'housing',
     city: first.city,
@@ -250,26 +240,44 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
   }
 
   if (source === 'craigslist') {
-    return items.map(item => ({
-      externalId: String(item.id || item.postId || Math.random()),
-      source: 'craigslist',
-      url: String(item.url || ''),
-      title: String(item.title || ''),
-      address: String(item.location || item.address || ''),
-      city: String(item.city || ''),
-      state: String(item.state || ''),
-      neighborhood: item.neighborhood ? String(item.neighborhood) : null,
-      zipCode: item.zipCode ? String(item.zipCode) : null,
-      // price is a formatted string like "$1,450" — strip non-numeric chars before parsing
-      rent: Math.round((parseFloat(String(item.price || '0').replace(/[^0-9.]/g, '')) || 0) * 100),
-      bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
-      bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
-      sqft: item.sqft ? Number(item.sqft) : null,
-      availableDate: item.availableDate ? String(item.availableDate) : null,
-      amenities: [],
-      description: item.description ? String(item.description) : null,
-      images: Array.isArray(item.images) ? item.images.map(String) : [],
-    }))
+    return items.map(item => {
+      // bedrooms/bathrooms come as "1BR / 1Ba" — parseInt handles the leading digit correctly
+      const bedroomStr = String(item.bedrooms || '')
+      const bedrooms = bedroomStr ? parseInt(bedroomStr) : null  // "1BR / 1Ba" → 1, "0BR" → 0
+      const bathMatch = bedroomStr.match(/(\d+)\s*[Bb]a/)
+      const bathrooms = bathMatch ? parseInt(bathMatch[1]) : null  // "1BR / 1Ba" → 1
+
+      // sqft comes as "550ft2" — strip non-numeric chars
+      const sqftStr = String(item.sqft || '')
+      const sqft = sqftStr ? (parseInt(sqftStr.replace(/[^0-9]/g, '')) || null) : null
+
+      // price comes as "$1,120" — strip non-numeric chars before parsing
+      const rent = Math.round((parseFloat(String(item.price || '0').replace(/[^0-9.]/g, '')) || 0) * 100)
+
+      // city/state not returned by actor — use what's in the title/location context
+      // address: prefer structured address, fall back to location string
+      const address = String(item.address || item.location || '')
+
+      return {
+        externalId: String(item.id || item.postId || Math.random()),
+        source: 'craigslist',
+        url: String(item.url || ''),
+        title: String(item.title || ''),
+        address,
+        city: String(item.city || ''),
+        state: String(item.state || ''),
+        neighborhood: item.location ? String(item.location).split(',')[0].trim() : null,
+        zipCode: item.zipCode ? String(item.zipCode) : null,
+        rent,
+        bedrooms,
+        bathrooms,
+        sqft,
+        availableDate: item.postedAt ? String(item.postedAt).split('T')[0] : null,
+        amenities: [],
+        description: item.description ? String(item.description) : null,
+        images: Array.isArray(item.images) ? item.images.map(String) : [],
+      }
+    })
   }
 
   if (source === 'trulia') {
