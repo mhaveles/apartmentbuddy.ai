@@ -84,22 +84,21 @@ export async function POST(req: NextRequest) {
 
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/apify/webhook?secret=${process.env.CRON_SECRET}`
 
-  const [zillowResult, craigslistResult] = await Promise.allSettled([
-    startZillowScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
+  const [craigslistResult] = await Promise.allSettled([
     startCraigslistScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
+    // startZillowScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
     // startApartmentsComScrape(neighborhoods, webhookUrl, searchRun.id),
     // startTruliaScrape(neighborhoods, webhookUrl, searchRun.id),
   ])
 
   const runIds = {
-    zillow: zillowResult.status === 'fulfilled' ? zillowResult.value : null,
     craigslist: craigslistResult.status === 'fulfilled' ? craigslistResult.value : null,
+    // zillow: zillowResult.status === 'fulfilled' ? zillowResult.value : null,
   }
 
   const successfulStarts = Object.values(runIds).filter(Boolean).length
 
   const failures = [
-    zillowResult.status === 'rejected' ? `zillow: ${(zillowResult.reason as Error).message}` : null,
     craigslistResult.status === 'rejected' ? `craigslist: ${(craigslistResult.reason as Error).message}` : null,
   ].filter(Boolean) as string[]
 
