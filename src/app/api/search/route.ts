@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   const [zillowResult, craigslistResult] = await Promise.allSettled([
     startZillowScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
-    startCraigslistScrape(neighborhoods, webhookUrl, searchRun.id),
+    startCraigslistScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
     // startApartmentsComScrape(neighborhoods, webhookUrl, searchRun.id),
     // startTruliaScrape(neighborhoods, webhookUrl, searchRun.id),
   ])

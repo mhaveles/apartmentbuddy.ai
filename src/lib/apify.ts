@@ -145,18 +145,30 @@ export async function startApartmentsComScrape(
 export async function startCraigslistScrape(
   neighborhoods: Neighborhood,
   webhookUrl: string,
-  searchRunId: string
+  searchRunId: string,
+  preferences?: { max_rent?: number | null; min_bedrooms?: number | null }
 ): Promise<string> {
   // actor: automation-lab/craigslist-scraper
-  // searchQueries = text queries (not URLs). Each query is searched independently.
+  // searchQueries = text queries searched on the city's Craigslist.
+  // Craigslist understands "1br", "2br" bedroom syntax natively.
+  // Use zip_code as primary location (most precise), fall back to neighborhood + city.
   // includeDetails: true follows each listing URL to get full description, price, images.
   const first = neighborhoods[0]
   const searchQueries = neighborhoods.map(n => {
-    const parts = ['apartment for rent']
-    if (n.neighborhood) parts.push(n.neighborhood)
-    if (n.zip_code) parts.push(n.zip_code)
-    if (n.city) parts.push(n.city)
-    return parts.join(', ')
+    const parts: string[] = []
+    // Bedroom preference narrows results the same way Zillow's filterState does
+    if (preferences?.min_bedrooms) {
+      parts.push(`${preferences.min_bedrooms}br`)
+    }
+    // Zip is most precise; fall back to neighborhood then city
+    if (n.zip_code) {
+      parts.push(n.zip_code)
+    } else if (n.neighborhood) {
+      parts.push(`${n.neighborhood} ${n.city}`)
+    } else {
+      parts.push(n.city)
+    }
+    return parts.join(' ')
   })
   return startActor('automation-lab/craigslist-scraper', {
     category: 'housing',
