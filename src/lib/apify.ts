@@ -149,16 +149,18 @@ function buildCraigslistUrl(
   // Build a full Craigslist search URL using their native filter parameters.
   // This mirrors exactly what a user would do manually — geographic radius, bedroom range, pets, price.
   const cityDomain = n.city.toLowerCase().replace(/\s+/g, '')
-  const citySlug = `${n.city.toLowerCase().replace(/\s+/g, '-')}-${n.state.toLowerCase()}`
-  const base = `https://${cityDomain}.craigslist.org/search/${citySlug}/apa`
+  const base = `https://${cityDomain}.craigslist.org/search/apa`
 
   const params = new URLSearchParams()
 
-  // Geographic targeting: derive lat/lon from map_bounds center
-  if (n.map_bounds) {
+  // Geographic targeting: prefer zip code + radius, fall back to lat/lon from map_bounds
+  if (n.zip_code) {
+    params.set('postal', n.zip_code)
+    params.set('search_distance', '3')  // 3 mile radius — tight neighborhood scope
+  } else if (n.map_bounds) {
     params.set('lat', ((n.map_bounds.north + n.map_bounds.south) / 2).toFixed(4))
     params.set('lon', ((n.map_bounds.east + n.map_bounds.west) / 2).toFixed(4))
-    params.set('search_distance', '0.5')  // 0.5 mile radius — tight neighborhood scope
+    params.set('search_distance', '3')
   }
 
   // Bedroom range from preferences
@@ -192,17 +194,20 @@ export async function startCraigslistScrape(
   searchRunId: string,
   preferences?: { max_rent?: number | null; min_bedrooms?: number | null; max_bedrooms?: number | null; pet_friendly?: boolean | null }
 ): Promise<string> {
-  // Use a single broad text query to capture as many listings as possible from the city.
-  // The actor's text search can't apply geographic or structured filters — those are Craigslist
-  // URL params the actor doesn't support. Instead: cast the widest net, let Claude scoring
-  // handle filtering by location, price, bedrooms, and preferences.
   const first = neighborhoods[0]
+  // Use the neighborhood name as the search query for geographic relevance.
+  // Also pass price/bedroom params — the actor claims to support price filtering;
+  // if supported these pre-filter results before they reach us.
   return startActor('automation-lab/craigslist-scraper', {
     category: 'housing',
     city: first.city,
     includeDetails: true,
     maxResults: 100,
-    searchQueries: ['apartment'],
+    searchQueries: [first.neighborhood || 'apartment'],
+    ...(preferences?.max_rent     && { maxPrice:    Math.round(preferences.max_rent / 100) }),
+    ...(preferences?.min_bedrooms && { minBedrooms: preferences.min_bedrooms }),
+    ...(preferences?.max_bedrooms && { maxBedrooms: preferences.max_bedrooms }),
+    ...(preferences?.pet_friendly && { pets: true }),
   }, buildWebhooks(webhookUrl, searchRunId, 'craigslist'))
 }
 

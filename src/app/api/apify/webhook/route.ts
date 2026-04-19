@@ -122,7 +122,16 @@ export async function POST(req: NextRequest) {
     if (preferences && savedListings.length > 0) {
       after(async () => {
         const CONCURRENCY = 5
-        const toScore = savedListings.slice(0, 50) // cap at 50 to stay within 60s Vercel limit
+        // Filter by user preferences before scoring — only score listings that actually match.
+        // All listings are already saved to the DB above; this just narrows what gets scored.
+        const filteredForScoring = savedListings.filter(({ listing }) => {
+          if (preferences.max_rent && listing.rent > preferences.max_rent) return false
+          if (preferences.min_bedrooms != null && listing.bedrooms !== null && listing.bedrooms < preferences.min_bedrooms) return false
+          if (preferences.max_bedrooms != null && listing.bedrooms !== null && listing.bedrooms > preferences.max_bedrooms) return false
+          return true
+        })
+        console.log(`Pre-score filter: ${filteredForScoring.length}/${savedListings.length} listings match preferences`)
+        const toScore = filteredForScoring.slice(0, 50) // cap at 50 to stay within 60s Vercel limit
         let scored = 0
         for (let i = 0; i < toScore.length; i += CONCURRENCY) {
           const batch = toScore.slice(i, i + CONCURRENCY)
