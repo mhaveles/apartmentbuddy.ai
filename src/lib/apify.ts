@@ -216,13 +216,20 @@ export async function startTruliaScrape(
   webhookUrl: string,
   searchRunId: string
 ): Promise<string> {
-  const searchUrls = neighborhoods.map(n => {
-    const location = n.zip_code || `${n.neighborhood.toLowerCase().replace(/\s+/g, '-')}-${n.city.toLowerCase()}-${n.state.toLowerCase()}`
-    return `https://www.trulia.com/for_rent/${location}/`
-  })
-  return startActor('epctex/trulia-scraper', {
-    startUrls: searchUrls.map(url => ({ url })),
+  const first = neighborhoods[0]
+  const state = first.state.toUpperCase()
+  const city = first.city.replace(/\s+/g, '_')   // "New York" → "New_York"
+  const searchLocation = `${city},${state}`        // "Denver,CO"
+  return startActor('memo23/trulia-scraper', {
+    startUrls: [`https://www.trulia.com/for_rent/${searchLocation}/`],
+    searchListingType: 'FOR_RENT',
+    searchLocation,
+    searchSort: 'RECOMMENDED',
     maxItems: 50,
+    proxy: {
+      useApifyProxy: true,
+      apifyProxyGroups: ['RESIDENTIAL'],
+    },
   }, buildWebhooks(webhookUrl, searchRunId, 'trulia'))
 }
 
@@ -323,24 +330,27 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
   }
 
   if (source === 'trulia') {
+    // Log first raw item so we can verify/fix field mapping after first test run
+    if (items.length > 0) console.log('TRULIA RAW ITEM:', JSON.stringify(items[0], null, 2))
     return items.map(item => ({
-      externalId: String(item.id || item.propertyId || Math.random()),
+      externalId: String(item.id || item.listingId || item.trulia_id || Math.random()),
       source: 'trulia',
-      url: String(item.url || ''),
+      url: String(item.url || item.listingUrl || item.detailUrl || ''),
       title: String(item.title || item.name || ''),
-      address: String(item.address || item.streetAddress || ''),
+      address: String(item.address || item.streetAddress || item.fullAddress || ''),
       city: String(item.city || ''),
       state: String(item.state || ''),
       neighborhood: item.neighborhood ? String(item.neighborhood) : null,
       zipCode: item.zipCode ? String(item.zipCode) : null,
-      rent: Math.round((Number(item.price) || 0) * 100),
-      bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
-      bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
-      sqft: item.sqft ? Number(item.sqft) : null,
+      rent: Math.round((Number(item.price || item.listPrice || item.rentPrice) || 0) * 100),
+      bedrooms: item.bedrooms != null ? Number(item.bedrooms) : item.beds != null ? Number(item.beds) : null,
+      bathrooms: item.bathrooms != null ? Number(item.bathrooms) : item.baths != null ? Number(item.baths) : null,
+      sqft: item.sqft != null ? Number(item.sqft) : item.floorSpace != null ? Number(item.floorSpace) : null,
       availableDate: item.availableDate ? String(item.availableDate) : null,
       amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
       description: item.description ? String(item.description) : null,
-      images: Array.isArray(item.photos) ? item.photos.map(String) : [],
+      images: Array.isArray(item.photos) ? item.photos.map(String)
+            : Array.isArray(item.images) ? item.images.map(String) : [],
     }))
   }
 
