@@ -243,49 +243,66 @@ export async function fetchScrapedListingsByRunId(
   return mapListings(items, source)
 }
 
+// Apartments are typically 100–4000 sqft. Values outside this range are almost always
+// misreported lot size, building size, or data mapping errors from the scraper.
+function sanitizeSqft(val: number | null | undefined): number | null {
+  if (val == null || isNaN(Number(val))) return null
+  const n = Number(val)
+  if (n < 100 || n > 4000) return null
+  return n
+}
+
 function mapListings(items: Record<string, unknown>[], source: string): ScrapedListing[] {
   if (source === 'zillow') {
-    return items.map(item => ({
-      externalId: String(item.zpid || item.id || Math.random()),
-      source: 'zillow',
-      url: String(item.detailUrl || item.url || ''),
-      title: String(item.statusText || `${item.bedrooms}bd ${item.bathrooms}ba`),
-      address: String(item.streetAddress || item.address || ''),
-      city: String(item.city || ''),
-      state: String(item.state || ''),
-      neighborhood: item.neighborhood ? String(item.neighborhood) : null,
-      zipCode: item.zipcode ? String(item.zipcode) : null,
-      rent: Math.round((Number(item.price) || 0) * 100),
-      bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
-      bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
-      sqft: item.livingArea ? Number(item.livingArea) : null,
-      availableDate: null,
-      amenities: [],
-      description: item.description ? String(item.description) : null,
-      images: Array.isArray(item.photos) ? item.photos.map(String) : [],
-    }))
+    return items.flatMap(item => {
+      const zpid = item.zpid || item.id
+      if (!zpid) return [] // drop listings with no stable ID — Math.random() causes DB duplicates
+      return [{
+        externalId: String(zpid),
+        source: 'zillow',
+        url: String(item.detailUrl || item.url || ''),
+        title: String(item.statusText || `${item.bedrooms}bd ${item.bathrooms}ba`),
+        address: String(item.streetAddress || item.address || ''),
+        city: String(item.city || ''),
+        state: String(item.state || ''),
+        neighborhood: item.neighborhood ? String(item.neighborhood) : null,
+        zipCode: item.zipcode ? String(item.zipcode) : null,
+        rent: Math.round((Number(item.price) || 0) * 100),
+        bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
+        bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
+        sqft: sanitizeSqft(item.livingArea as number | null),
+        availableDate: null,
+        amenities: [],
+        description: item.description ? String(item.description) : null,
+        images: Array.isArray(item.photos) ? item.photos.map(String) : [],
+      }]
+    })
   }
 
   if (source === 'apartments_com') {
-    return items.map(item => ({
-      externalId: String(item.id || item.propertyId || Math.random()),
-      source: 'apartments_com',
-      url: String(item.url || item.detailUrl || ''),
-      title: String(item.name || item.title || ''),
-      address: String(item.address || ''),
-      city: String(item.city || ''),
-      state: String(item.state || ''),
-      neighborhood: null,
-      zipCode: item.zipCode ? String(item.zipCode) : null,
-      rent: Math.round((Number(item.minRent || item.rent) || 0) * 100),
-      bedrooms: item.beds ? Number(item.beds) : null,
-      bathrooms: item.baths ? Number(item.baths) : null,
-      sqft: item.sqft ? Number(item.sqft) : null,
-      availableDate: item.availableDate ? String(item.availableDate) : null,
-      amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
-      description: item.description ? String(item.description) : null,
-      images: Array.isArray(item.photos) ? item.photos.map(String) : [],
-    }))
+    return items.flatMap(item => {
+      const propertyId = item.id || item.propertyId
+      if (!propertyId) return []
+      return [{
+        externalId: String(propertyId),
+        source: 'apartments_com',
+        url: String(item.url || item.detailUrl || ''),
+        title: String(item.name || item.title || ''),
+        address: String(item.address || ''),
+        city: String(item.city || ''),
+        state: String(item.state || ''),
+        neighborhood: null,
+        zipCode: item.zipCode ? String(item.zipCode) : null,
+        rent: Math.round((Number(item.minRent || item.rent) || 0) * 100),
+        bedrooms: item.beds ? Number(item.beds) : null,
+        bathrooms: item.baths ? Number(item.baths) : null,
+        sqft: sanitizeSqft(item.sqft as number | null),
+        availableDate: item.availableDate ? String(item.availableDate) : null,
+        amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
+        description: item.description ? String(item.description) : null,
+        images: Array.isArray(item.photos) ? item.photos.map(String) : [],
+      }]
+    })
   }
 
   if (source === 'craigslist') {
@@ -307,8 +324,10 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
       // address: prefer structured address, fall back to location string
       const address = String(item.address || item.location || '')
 
+      const postId = item.id || item.postId
+      if (!postId) return null
       return {
-        externalId: String(item.id || item.postId || Math.random()),
+        externalId: String(postId),
         source: 'craigslist',
         url: String(item.url || ''),
         title: String(item.title || ''),
@@ -320,38 +339,43 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
         rent,
         bedrooms,
         bathrooms,
-        sqft,
+        sqft: sanitizeSqft(sqft),
         availableDate: item.postedAt ? String(item.postedAt).split('T')[0] : null,
         amenities: [],
         description: item.description ? String(item.description) : null,
         images: Array.isArray(item.images) ? item.images.map(String) : [],
       }
-    })
+    }).filter((l): l is ScrapedListing => l !== null)
   }
 
   if (source === 'trulia') {
     // Log first raw item so we can verify/fix field mapping after first test run
     if (items.length > 0) console.log('TRULIA RAW ITEM:', JSON.stringify(items[0], null, 2))
-    return items.map(item => ({
-      externalId: String(item.id || item.listingId || item.trulia_id || Math.random()),
-      source: 'trulia',
-      url: String(item.url || item.listingUrl || item.detailUrl || ''),
-      title: String(item.title || item.name || ''),
-      address: String(item.address || item.streetAddress || item.fullAddress || ''),
-      city: String(item.city || ''),
-      state: String(item.state || ''),
-      neighborhood: item.neighborhood ? String(item.neighborhood) : null,
-      zipCode: item.zipCode ? String(item.zipCode) : null,
-      rent: Math.round((Number(item.price || item.listPrice || item.rentPrice) || 0) * 100),
-      bedrooms: item.bedrooms != null ? Number(item.bedrooms) : item.beds != null ? Number(item.beds) : null,
-      bathrooms: item.bathrooms != null ? Number(item.bathrooms) : item.baths != null ? Number(item.baths) : null,
-      sqft: item.sqft != null ? Number(item.sqft) : item.floorSpace != null ? Number(item.floorSpace) : null,
-      availableDate: item.availableDate ? String(item.availableDate) : null,
-      amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
-      description: item.description ? String(item.description) : null,
-      images: Array.isArray(item.photos) ? item.photos.map(String)
-            : Array.isArray(item.images) ? item.images.map(String) : [],
-    }))
+    return items.flatMap(item => {
+      const listingId = item.id || item.listingId || item.trulia_id
+      if (!listingId) return []
+      const rawSqft = item.sqft != null ? Number(item.sqft) : item.floorSpace != null ? Number(item.floorSpace) : null
+      return [{
+        externalId: String(listingId),
+        source: 'trulia',
+        url: String(item.url || item.listingUrl || item.detailUrl || ''),
+        title: String(item.title || item.name || ''),
+        address: String(item.address || item.streetAddress || item.fullAddress || ''),
+        city: String(item.city || ''),
+        state: String(item.state || ''),
+        neighborhood: item.neighborhood ? String(item.neighborhood) : null,
+        zipCode: item.zipCode ? String(item.zipCode) : null,
+        rent: Math.round((Number(item.price || item.listPrice || item.rentPrice) || 0) * 100),
+        bedrooms: item.bedrooms != null ? Number(item.bedrooms) : item.beds != null ? Number(item.beds) : null,
+        bathrooms: item.bathrooms != null ? Number(item.bathrooms) : item.baths != null ? Number(item.baths) : null,
+        sqft: sanitizeSqft(rawSqft),
+        availableDate: item.availableDate ? String(item.availableDate) : null,
+        amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
+        description: item.description ? String(item.description) : null,
+        images: Array.isArray(item.photos) ? item.photos.map(String)
+              : Array.isArray(item.images) ? item.images.map(String) : [],
+      }]
+    })
   }
 
   return []

@@ -25,8 +25,32 @@ export async function GET(req: NextRequest) {
 
   const { data } = await query
 
-  const available = (data || []).filter(ul => (ul.listing as { is_available?: boolean } | null)?.is_available !== false)
-  return NextResponse.json(available)
+  type ListingRecord = { url?: string; address?: string; rent?: number; is_available?: boolean }
+
+  // Filter unavailable listings
+  const available = (data || []).filter(ul => (ul.listing as ListingRecord | null)?.is_available !== false)
+
+  // Deduplicate: same URL or same address+rent from different sources — keep highest score (already sorted desc)
+  const seen = new Set<string>()
+  const deduplicated = available.filter(ul => {
+    const l = ul.listing as ListingRecord | null
+    const url = l?.url?.trim()
+    const address = l?.address?.toLowerCase().trim()
+    const rent = l?.rent
+
+    if (url) {
+      if (seen.has(`url:${url}`)) return false
+      seen.add(`url:${url}`)
+    }
+    if (address && address.length > 5 && rent) {
+      const key = `addr:${address}:${rent}`
+      if (seen.has(key)) return false
+      seen.add(key)
+    }
+    return true
+  })
+
+  return NextResponse.json(deduplicated)
 }
 
 export async function PATCH(req: NextRequest) {
