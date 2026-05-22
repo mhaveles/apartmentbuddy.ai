@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
 
   const { data } = await query
 
-  return NextResponse.json(data || [])
+  const available = (data || []).filter(ul => (ul.listing as { is_available?: boolean } | null)?.is_available !== false)
+  return NextResponse.json(available)
 }
 
 export async function PATCH(req: NextRequest) {

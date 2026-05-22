@@ -22,7 +22,19 @@ export default function ListingsPage() {
     setLoading(false)
   }, [savedOnly])
 
-  useEffect(() => { loadListings() }, [loadListings])
+  const checkAvailability = useCallback(async () => {
+    try {
+      const res = await fetch('/api/listings/check-availability', { method: 'POST' })
+      const { removed } = await res.json()
+      if (removed > 0) loadListings()
+    } catch {
+      // non-critical — silently ignore
+    }
+  }, [loadListings])
+
+  useEffect(() => {
+    loadListings().then(() => checkAvailability())
+  }, [loadListings, checkAvailability])
 
   // On load, resume polling if there's an in-progress search (up to 12 min old)
   useEffect(() => {
