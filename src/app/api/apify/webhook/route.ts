@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchScrapedListingsByRunId } from '@/lib/apify'
-import { anthropic, SCORING_PROMPT } from '@/lib/anthropic'
+import { getAnthropic, SCORING_PROMPT } from '@/lib/anthropic'
 
 export const maxDuration = 60
 
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
             if (existing) return 0
 
             try {
-              const scoreResponse = await anthropic.messages.create({
+              const scoreResponse = await getAnthropic().messages.create({
                 model: 'claude-haiku-4-5-20251001',
                 max_tokens: 512,
                 system: SCORING_PROMPT,

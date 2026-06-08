@@ -1,8 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
+// Lazy singleton — deferred until first call so build-time env var absence doesn't throw
+let _client: Anthropic | undefined
+export function getAnthropic(): Anthropic {
+  return _client ?? (_client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }))
+}
 
 export const SYSTEM_PROMPT = `You are ApartmentBuddy, a friendly and knowledgeable AI assistant that helps people find their perfect apartment. Your goal is to understand what makes a living space ideal for them — not just for the next few months, but for 2+ years.
 

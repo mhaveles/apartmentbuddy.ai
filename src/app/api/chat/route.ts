@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { anthropic, SYSTEM_PROMPT } from '@/lib/anthropic'
+import { getAnthropic, SYSTEM_PROMPT } from '@/lib/anthropic'
 import { Message } from '@/types'
 
 export async function POST(req: NextRequest) {
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     messages.push(newUserMessage)
 
     // Call Claude
-    const response = await anthropic.messages.create({
+    const response = await getAnthropic().messages.create({
       model: 'claude-opus-4-6',
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
             pet_friendly: prefs.pet_friendly ?? null,
             parking_required: prefs.parking_required ?? null,
             in_unit_laundry: prefs.in_unit_laundry ?? null,
+            air_conditioning: prefs.air_conditioning ?? null,
             gym: prefs.gym ?? null,
             rooftop: prefs.rooftop ?? null,
             doorman: prefs.doorman ?? null,
