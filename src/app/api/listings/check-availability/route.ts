@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   type ListingRow = { id: string; url: string; is_available: boolean; availability_checked_at: string | null }
 
   const toCheck = userListings
-    .map(ul => ul.listing as ListingRow | null)
+    .map(ul => ul.listing as unknown as ListingRow | null)
     .filter((l): l is ListingRow =>
       l !== null &&
       l.is_available !== false &&
@@ -71,10 +71,10 @@ export async function POST(req: NextRequest) {
         is_available: available,
         availability_checked_at: new Date().toISOString(),
       }).eq('id', listing.id)
-      return available ? 0 : 1
+        return available ? 0 : 1
     }))
     checked += batch.length
-    removed += results.reduce((a, b) => a + b, 0)
+    removed += results.reduce((a: number, b: number) => a + b, 0)
   }
 
   return NextResponse.json({ checked, removed })

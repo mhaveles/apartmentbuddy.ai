@@ -214,22 +214,35 @@ export async function startCraigslistScrape(
 export async function startTruliaScrape(
   neighborhoods: Neighborhood,
   webhookUrl: string,
-  searchRunId: string
+  searchRunId: string,
+  preferences?: { max_rent?: number | null; min_bedrooms?: number | null; max_bedrooms?: number | null; min_bathrooms?: number | null; pet_friendly?: boolean | null; in_unit_laundry?: boolean | null; air_conditioning?: boolean | null; gym?: boolean | null; parking_required?: boolean | null }
 ): Promise<string> {
   const first = neighborhoods[0]
-  const state = first.state.toUpperCase()
-  const city = first.city.replace(/\s+/g, '_')   // "New York" → "New_York"
-  const searchLocation = `${city},${state}`        // "Denver,CO"
-  return startActor('memo23/trulia-scraper', {
-    startUrls: [`https://www.trulia.com/for_rent/${searchLocation}/`],
-    searchListingType: 'FOR_RENT',
-    searchLocation,
-    searchSort: 'RECOMMENDED',
+  // Prefer ZIP code — more targeted than city name (actor accepts city, ZIP, or neighborhood)
+  const location = first.zip_code || `${first.city}, ${first.state.toUpperCase()}`
+
+  const pets: string[] = preferences?.pet_friendly ? ['cats', 'large_dogs'] : []
+  const unitAmenities: string[] = preferences?.in_unit_laundry ? ['washerdryer'] : []
+  const buildingAmenities: string[] = [
+    ...(preferences?.gym ? ['gym'] : []),
+    ...(preferences?.parking_required ? ['garage'] : []),
+  ]
+
+  return startActor('igolaizola/trulia-scraper', {
+    location,
+    operation: 'rent',
+    sortBy: 'best',
+    space: 'entire_space',
     maxItems: 50,
-    proxy: {
-      useApifyProxy: true,
-      apifyProxyGroups: ['RESIDENTIAL'],
-    },
+    includeOffMarket: false,
+    ...(preferences?.air_conditioning        && { airConditioning: true }),
+    ...(preferences?.max_rent                && { maxPrice: Math.round(preferences.max_rent / 100) }),
+    ...(preferences?.min_bedrooms  != null   && { minBeds:  preferences.min_bedrooms }),
+    ...(preferences?.max_bedrooms  != null   && { maxBeds:  preferences.max_bedrooms }),
+    ...(preferences?.min_bathrooms != null   && { minBaths: preferences.min_bathrooms }),
+    ...(pets.length > 0                      && { pets }),
+    ...(unitAmenities.length > 0             && { unitAmenities }),
+    ...(buildingAmenities.length > 0         && { buildingAmenities }),
   }, buildWebhooks(webhookUrl, searchRunId, 'trulia'))
 }
 
@@ -341,7 +354,7 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
         bathrooms,
         sqft: sanitizeSqft(sqft),
         availableDate: item.postedAt ? String(item.postedAt).split('T')[0] : null,
-        amenities: [],
+        amenities: [] as string[],
         description: item.description ? String(item.description) : null,
         images: Array.isArray(item.images) ? item.images.map(String) : [],
       }
@@ -349,31 +362,53 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
   }
 
   if (source === 'trulia') {
-    // Log first raw item so we can verify/fix field mapping after first test run
-    if (items.length > 0) console.log('TRULIA RAW ITEM:', JSON.stringify(items[0], null, 2))
     return items.flatMap(item => {
-      const listingId = item.id || item.listingId || item.trulia_id
-      if (!listingId) return []
-      const rawSqft = item.sqft != null ? Number(item.sqft) : item.floorSpace != null ? Number(item.floorSpace) : null
+      // Skip non-rental or inactive listings
+      if (!item['currentStatus.isActiveForRent']) return []
+
+      // Build a lookup from the tracking key-value array
+      type TrackingEntry = { key: string; value: string }
+      const tracking = Array.isArray(item.tracking) ? (item.tracking as TrackingEntry[]) : []
+      const trackingMap = Object.fromEntries(tracking.map(e => [e.key, e.value]))
+
+      // Stable ID: zPID from tracking, fall back to stripping _ZPID suffix from typedHomeId
+      const externalId = trackingMap.zPID || String(item['metadata.typedHomeId'] || '').replace('_ZPID', '')
+      if (!externalId) return []
+
+      // listingPrice in tracking is a clean dollar integer string ("3000")
+      const rent = Math.round((parseFloat(trackingMap.listingPrice || '0') || 0) * 100)
+
+      // "2bd" → 2, "6bd" → 6
+      const bedrooms = parseInt(String(item['bedrooms.formattedValue'] || '')) || null
+      // "2ba" → 2, "4.5ba" → 4.5 — parseFloat stops at the 'b'
+      const bathrooms = parseFloat(String(item['bathrooms.formattedValue'] || '')) || null
+
+      // "1,271 sqft" → strip commas + letters → 1271
+      const sqftRaw = parseInt(String(item['floorSpace.formattedDimension'] || '').replace(/[^0-9]/g, '')) || null
+
+      // Amenities surfaced via largeTags (pet friendly is the main one in list view)
+      type Tag = { formattedName: string }
+      const tagNames = Array.isArray(item.largeTags) ? (item.largeTags as Tag[]).map(tag => tag.formattedName) : []
+      const amenities: string[] = tagNames.some(tag => tag.includes('PET FRIENDLY')) ? ['pet_friendly'] : []
+
       return [{
-        externalId: String(listingId),
+        externalId,
         source: 'trulia',
-        url: String(item.url || item.listingUrl || item.detailUrl || ''),
-        title: String(item.title || item.name || ''),
-        address: String(item.address || item.streetAddress || item.fullAddress || ''),
-        city: String(item.city || ''),
-        state: String(item.state || ''),
-        neighborhood: item.neighborhood ? String(item.neighborhood) : null,
-        zipCode: item.zipCode ? String(item.zipCode) : null,
-        rent: Math.round((Number(item.price || item.listPrice || item.rentPrice) || 0) * 100),
-        bedrooms: item.bedrooms != null ? Number(item.bedrooms) : item.beds != null ? Number(item.beds) : null,
-        bathrooms: item.bathrooms != null ? Number(item.bathrooms) : item.baths != null ? Number(item.baths) : null,
-        sqft: sanitizeSqft(rawSqft),
-        availableDate: item.availableDate ? String(item.availableDate) : null,
-        amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
-        description: item.description ? String(item.description) : null,
-        images: Array.isArray(item.photos) ? item.photos.map(String)
-              : Array.isArray(item.images) ? item.images.map(String) : [],
+        url: String(item.url || ''),
+        title: String(item['location.formattedLocation'] || ''),
+        address: String(item['location.streetAddress'] || ''),
+        city: String(item['location.city'] || ''),
+        state: String(item['location.stateCode'] || ''),
+        neighborhood: null,
+        zipCode: item['location.zipCode'] ? String(item['location.zipCode']) : null,
+        rent,
+        bedrooms,
+        bathrooms,
+        sqft: sanitizeSqft(sqftRaw),
+        availableDate: item['activeListing.dateListed'] ? String(item['activeListing.dateListed']).split('T')[0] : null,
+        amenities,
+        description: null,
+        images: [],
       }]
     })
   }
