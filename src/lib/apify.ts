@@ -82,48 +82,35 @@ export async function startZillowScrape(
   neighborhoods: Neighborhood,
   webhookUrl: string,
   searchRunId: string,
-  preferences?: { max_rent?: number | null; min_bedrooms?: number | null; min_bathrooms?: number | null }
+  preferences?: {
+    max_rent?: number | null
+    min_bedrooms?: number | null
+    min_bathrooms?: number | null
+    air_conditioning?: boolean | null
+    in_unit_laundry?: boolean | null
+    parking_required?: boolean | null
+    pet_friendly?: boolean | null
+    gym?: boolean | null
+  }
 ): Promise<string> {
-  // actor: maxcopell/zillow-scraper — requires searchUrls with ?searchQueryState= in the URL
-  // The geographic identifier MUST be in the URL path (e.g. /80218_rb/ or /denver-co/rentals/)
-  // so Zillow scopes the search to that area. Without it, 0 results.
-  // Use short-form filter keys (fr, fsba, beds, baths, mp) — the actor parses Zillow's public URL format.
-  // mp = monthly payment (dollars), max_rent stored in cents so divide by 100.
-  // Geocode any neighborhoods that don't have stored bounds yet
-  const boundsMap = await Promise.all(
-    neighborhoods.map(async n => n.map_bounds ?? (n.zip_code ? await geocodeZip(n.zip_code) : null))
-  )
+  // actor: igolaizola/zillow-scraper-ppe — takes a plain location string + boolean amenity flags.
+  // Use the most specific location we have: zip > "Neighborhood, City, ST" > "City, ST".
+  const first = neighborhoods[0]
+  const location = first.zip_code
+    ? first.zip_code
+    : first.neighborhood
+      ? `${first.neighborhood}, ${first.city}, ${first.state.toUpperCase()}`
+      : `${first.city}, ${first.state.toUpperCase()}`
 
-  const searchUrls = neighborhoods.map((n, i) => {
-    const filterState: Record<string, unknown> = {
-      fr:   { value: true  },
-      fsba: { value: false },
-      fsbo: { value: false },
-      nc:   { value: false },
-      cmsn: { value: false },
-      auc:  { value: false },
-      fore: { value: false },
-    }
-    if (preferences?.min_bedrooms) filterState.beds = { min: preferences.min_bedrooms }
-    if (preferences?.min_bathrooms) filterState.baths = { min: preferences.min_bathrooms }
-    if (preferences?.max_rent) filterState.mp = { max: Math.round(preferences.max_rent / 100) }
-
-    const bounds = boundsMap[i]
-    const searchQueryStateObj: Record<string, unknown> = {
-      isMapVisible: true,
-      isListVisible: true,
-      filterState,
-    }
-    if (bounds) {
-      searchQueryStateObj.mapBounds = bounds
-    }
-
-    return { url: `https://www.zillow.com/homes/for_rent/?searchQueryState=${encodeURIComponent(JSON.stringify(searchQueryStateObj))}` }
-  })
-  return startActor('maxcopell/zillow-scraper', {
-    searchUrls,
+  return startActor('igolaizola/zillow-scraper-ppe', {
+    location,
+    fetchDetails: true,
+    flattenOutput: true,
     maxItems: 50,
-    type: 'rent',
+    // Boolean amenity flags from user preferences
+    ...(preferences?.air_conditioning  && { airConditioning: true }),
+    ...(preferences?.in_unit_laundry   && { inUnitLaundry: true }),
+    ...(preferences?.parking_required  && { garage: true, onSiteParking: true }),
   }, buildWebhooks(webhookUrl, searchRunId, 'zillow'))
 }
 
@@ -275,27 +262,54 @@ function sanitizeSqft(val: number | null | undefined): number | null {
 
 function mapListings(items: Record<string, unknown>[], source: string): ScrapedListing[] {
   if (source === 'zillow') {
+    // igolaizola/zillow-scraper-ppe with flattenOutput:true returns dot-notation keys.
+    // Log the first raw item so we can verify field names after the first real run.
+    if (items.length > 0) console.log('ZILLOW PPE RAW ITEM:', JSON.stringify(items[0], null, 2))
+
     return items.flatMap(item => {
-      const zpid = item.zpid || item.id
-      if (!zpid) return [] // drop listings with no stable ID — Math.random() causes DB duplicates
+      // zpid is the stable Zillow property ID — prefer it; fall back to id
+      const zpid = item.zpid || item['hdpData.homeInfo.zpid'] || item.id
+      if (!zpid) return []
+
+      // flattenOutput:true uses dot-notation keys for nested objects
+      const streetAddress = item['address.streetAddress'] || item.streetAddress || item.address || ''
+      const city          = item['address.city']          || item.city          || ''
+      const state         = item['address.state']         || item.state         || ''
+      const zipCode       = item['address.zipcode']       || item.zipcode       || item.zipCode || null
+      const price         = Number(item['hdpData.homeInfo.price'] || item.price || 0)
+      const beds          = item.bedrooms  ?? item['hdpData.homeInfo.bedrooms']  ?? null
+      const baths         = item.bathrooms ?? item['hdpData.homeInfo.bathrooms'] ?? null
+      const sqftRaw       = item.livingArea ?? item['hdpData.homeInfo.livingArea'] ?? null
+      const detailUrl     = String(item.detailUrl || item.url || '')
+      const desc          = item.description ? String(item.description) : null
+      const imgs: string[] = Array.isArray(item.photos)
+        ? item.photos.map(String)
+        : Array.isArray(item['miniCardPhotos'])
+          ? (item['miniCardPhotos'] as Array<{ url?: string }>).map(p => p?.url ?? '').filter(Boolean)
+          : []
+
+      const bedsLabel  = beds  != null ? `${beds}bd`  : ''
+      const bathsLabel = baths != null ? `${baths}ba` : ''
+      const title = String([bedsLabel, bathsLabel].filter(Boolean).join(' ') || streetAddress)
+
       return [{
         externalId: String(zpid),
         source: 'zillow',
-        url: String(item.detailUrl || item.url || ''),
-        title: String(item.statusText || `${item.bedrooms}bd ${item.bathrooms}ba`),
-        address: String(item.streetAddress || item.address || ''),
-        city: String(item.city || ''),
-        state: String(item.state || ''),
+        url: detailUrl,
+        title,
+        address: String(streetAddress),
+        city: String(city),
+        state: String(state),
         neighborhood: item.neighborhood ? String(item.neighborhood) : null,
-        zipCode: item.zipcode ? String(item.zipcode) : null,
-        rent: Math.round((Number(item.price) || 0) * 100),
-        bedrooms: item.bedrooms ? Number(item.bedrooms) : null,
-        bathrooms: item.bathrooms ? Number(item.bathrooms) : null,
-        sqft: sanitizeSqft(item.livingArea as number | null),
+        zipCode: zipCode ? String(zipCode) : null,
+        rent: Math.round(price * 100),
+        bedrooms:  beds  != null ? Number(beds)  : null,
+        bathrooms: baths != null ? Number(baths) : null,
+        sqft: sanitizeSqft(sqftRaw as number | null),
         availableDate: null,
         amenities: [],
-        description: item.description ? String(item.description) : null,
-        images: Array.isArray(item.photos) ? item.photos.map(String) : [],
+        description: desc,
+        images: imgs,
       }]
     })
   }
@@ -370,47 +384,55 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
   }
 
   if (source === 'trulia') {
-    return items.flatMap(item => {
-      // Skip non-rental or inactive listings
-      if (!item['currentStatus.isActiveForRent']) return []
+    return items.flatMap((item, idx) => {
+      // Only drop listings explicitly marked inactive — missing field means assume active
+      if (item['currentStatus.isActiveForRent'] === false) return []
 
       type TrackingEntry = { key: string; value: string }
       const tracking = Array.isArray(item.tracking) ? (item.tracking as TrackingEntry[]) : []
       const trackingMap = Object.fromEntries(tracking.map(e => [e.key, e.value]))
 
-      const externalId = trackingMap.zPID || String(item['metadata.typedHomeId'] || '').replace('_ZPID', '')
+      // Log first raw item to verify field mapping in Vercel logs
+      if (idx === 0) console.log('TRULIA RAW ITEM:', JSON.stringify(item, null, 2))
+
+      // externalId: tracking zPID → typedHomeId suffix → direct zpid/id field
+      const externalId = trackingMap.zPID
+        || String(item['metadata.typedHomeId'] || '').replace('_ZPID', '')
+        || String(item.zpid || item.id || '')
       if (!externalId) return []
 
-      const rent = Math.round((parseFloat(trackingMap.listingPrice || '0') || 0) * 100)
-      const bedrooms = parseInt(String(item['bedrooms.formattedValue'] || '')) || null
-      const bathrooms = parseFloat(String(item['bathrooms.formattedValue'] || '')) || null
-      const sqftRaw = parseInt(String(item['floorSpace.formattedDimension'] || '').replace(/[^0-9]/g, '')) || null
+      // price: tracking listingPrice → direct price/rent fields
+      const rawPrice = trackingMap.listingPrice
+        || String(item.price || item.rent || item.listingPrice || '0')
+      const rent = Math.round((parseFloat(rawPrice) || 0) * 100)
+
+      // bedrooms/bathrooms/sqft: flat dotted keys → direct fields
+      const bedrooms = parseInt(String(item['bedrooms.formattedValue'] || item.bedrooms || '')) || null
+      const bathrooms = parseFloat(String(item['bathrooms.formattedValue'] || item.bathrooms || '')) || null
+      const sqftRaw = parseInt(String(item['floorSpace.formattedDimension'] || item.sqft || '').replace(/[^0-9]/g, '')) || null
 
       type Tag = { formattedName: string }
       const tagNames = Array.isArray(item.largeTags) ? (item.largeTags as Tag[]).map(t => t.formattedName) : []
       const amenities: string[] = tagNames.some(t => t.includes('PET FRIENDLY')) ? ['pet_friendly'] : []
 
-      // Log first raw item so we can verify field mapping after first successful run
-      if (items.indexOf(item) === 0) console.log('TRULIA RAW ITEM:', JSON.stringify(item, null, 2))
-
       return [{
         externalId,
         source: 'trulia',
         url: String(item.url || ''),
-        title: String(item['location.formattedLocation'] || ''),
-        address: String(item['location.streetAddress'] || ''),
-        city: String(item['location.city'] || ''),
-        state: String(item['location.stateCode'] || ''),
+        title: String(item['location.formattedLocation'] || item.title || item.address || ''),
+        address: String(item['location.streetAddress'] || item.address || ''),
+        city: String(item['location.city'] || item.city || ''),
+        state: String(item['location.stateCode'] || item.state || ''),
         neighborhood: null,
-        zipCode: item['location.zipCode'] ? String(item['location.zipCode']) : null,
+        zipCode: item['location.zipCode'] ? String(item['location.zipCode']) : (item.zipCode ? String(item.zipCode) : null),
         rent,
         bedrooms,
         bathrooms,
         sqft: sanitizeSqft(sqftRaw),
         availableDate: item['activeListing.dateListed'] ? String(item['activeListing.dateListed']).split('T')[0] : null,
         amenities,
-        description: null,
-        images: [],
+        description: item.description ? String(item.description) : null,
+        images: Array.isArray(item.images) ? item.images.map(String) : [],
       }]
     })
   }
