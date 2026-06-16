@@ -271,22 +271,25 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
       const zpid = item.zpid || item['hdpData.homeInfo.zpid'] || item.id
       if (!zpid) return []
 
-      // flattenOutput:true uses dot-notation keys for nested objects
+      // flattenOutput:true serialises nested objects with dot-notation keys.
+      // Confirmed field names from actor schema:
+      //   price.value, address.{streetAddress,city,state,zipcode} (dot-notation when flattened),
+      //   bedrooms, bathrooms, livingArea (top-level),
+      //   url / hdpUrl for the listing page,
+      //   media.allPropertyPhotos.highResolution (array of photo URLs),
+      //   _details.description (populated when fetchDetails:true)
       const streetAddress = item['address.streetAddress'] || item.streetAddress || item.address || ''
       const city          = item['address.city']          || item.city          || ''
       const state         = item['address.state']         || item.state         || ''
       const zipCode       = item['address.zipcode']       || item.zipcode       || item.zipCode || null
-      const price         = Number(item['hdpData.homeInfo.price'] || item.price || 0)
-      const beds          = item.bedrooms  ?? item['hdpData.homeInfo.bedrooms']  ?? null
-      const baths         = item.bathrooms ?? item['hdpData.homeInfo.bathrooms'] ?? null
-      const sqftRaw       = item.livingArea ?? item['hdpData.homeInfo.livingArea'] ?? null
-      const detailUrl     = String(item.detailUrl || item.url || '')
-      const desc          = item.description ? String(item.description) : null
-      const imgs: string[] = Array.isArray(item.photos)
-        ? item.photos.map(String)
-        : Array.isArray(item['miniCardPhotos'])
-          ? (item['miniCardPhotos'] as Array<{ url?: string }>).map(p => p?.url ?? '').filter(Boolean)
-          : []
+      const price         = Number(item['price.value']    || 0)
+      const beds          = item.bedrooms   ?? null
+      const baths         = item.bathrooms  ?? null
+      const sqftRaw       = item.livingArea ?? null
+      const detailUrl     = String(item.url || item.hdpUrl || '')
+      const desc          = item['_details.description'] ? String(item['_details.description']) : null
+      const rawPhotos     = item['media.allPropertyPhotos.highResolution']
+      const imgs: string[] = Array.isArray(rawPhotos) ? rawPhotos.map(String) : []
 
       const bedsLabel  = beds  != null ? `${beds}bd`  : ''
       const bathsLabel = baths != null ? `${baths}ba` : ''
