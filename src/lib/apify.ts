@@ -385,54 +385,68 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
 
   if (source === 'trulia') {
     return items.flatMap((item, idx) => {
-      // Only drop listings explicitly marked inactive — missing field means assume active
-      if (item['currentStatus.isActiveForRent'] === false) return []
-
+      // Scraper returns nested objects — access via typed casts, not flat-dotted keys
+      type Loc = { city?: string; stateCode?: string; zipCode?: string; streetAddress?: string; formattedLocation?: string }
+      type Beds = { formattedValue?: string }
+      type Floor = { formattedDimension?: string }
+      type Meta = { typedHomeId?: string }
+      type Media = { photos?: Array<{ url?: { large?: string } }> }
+      type ActiveListing = { dateListed?: string }
+      type CurrentStatus = { isActiveForRent?: boolean }
       type TrackingEntry = { key: string; value: string }
+      type Tag = { formattedName: string }
+
+      const loc = item.location as Loc | undefined
+      const status = item.currentStatus as CurrentStatus | undefined
+      if (status?.isActiveForRent === false) return []
+
+      if (idx === 0) console.log('TRULIA RAW ITEM[0] keys:', Object.keys(item))
+
       const tracking = Array.isArray(item.tracking) ? (item.tracking as TrackingEntry[]) : []
       const trackingMap = Object.fromEntries(tracking.map(e => [e.key, e.value]))
 
-      // Log first raw item to verify field mapping in Vercel logs
-      if (idx === 0) console.log('TRULIA RAW ITEM:', JSON.stringify(item, null, 2))
-
-      // externalId: tracking zPID → typedHomeId suffix → direct zpid/id field
       const externalId = trackingMap.zPID
-        || String(item['metadata.typedHomeId'] || '').replace('_ZPID', '')
+        || String((item.metadata as Meta | undefined)?.typedHomeId || '').replace('_ZPID', '')
         || String(item.zpid || item.id || '')
       if (!externalId) return []
 
-      // price: tracking listingPrice → direct price/rent fields
-      const rawPrice = trackingMap.listingPrice
-        || String(item.price || item.rent || item.listingPrice || '0')
+      const rawPrice = trackingMap.listingPrice || String(item.price || item.rent || '0')
       const rent = Math.round((parseFloat(rawPrice) || 0) * 100)
 
-      // bedrooms/bathrooms/sqft: flat dotted keys → direct fields
-      const bedrooms = parseInt(String(item['bedrooms.formattedValue'] || item.bedrooms || '')) || null
-      const bathrooms = parseFloat(String(item['bathrooms.formattedValue'] || item.bathrooms || '')) || null
-      const sqftRaw = parseInt(String(item['floorSpace.formattedDimension'] || item.sqft || '').replace(/[^0-9]/g, '')) || null
+      const bedsStr = (item.bedrooms as Beds | undefined)?.formattedValue || ''
+      const bathsStr = (item.bathrooms as Beds | undefined)?.formattedValue || ''
+      const sqftStr = (item.floorSpace as Floor | undefined)?.formattedDimension || ''
 
-      type Tag = { formattedName: string }
+      const bedrooms = parseInt(bedsStr) || null
+      const bathrooms = parseFloat(bathsStr) || null
+      const sqftRaw = parseInt(sqftStr.replace(/[^0-9]/g, '')) || null
+
       const tagNames = Array.isArray(item.largeTags) ? (item.largeTags as Tag[]).map(t => t.formattedName) : []
       const amenities: string[] = tagNames.some(t => t.includes('PET FRIENDLY')) ? ['pet_friendly'] : []
+
+      const photos = (item.media as Media | undefined)?.photos || []
+      const images = photos.map(p => p.url?.large).filter((u): u is string => !!u)
 
       return [{
         externalId,
         source: 'trulia',
         url: String(item.url || ''),
-        title: String(item['location.formattedLocation'] || item.title || item.address || ''),
-        address: String(item['location.streetAddress'] || item.address || ''),
-        city: String(item['location.city'] || item.city || ''),
-        state: String(item['location.stateCode'] || item.state || ''),
+        title: String(loc?.formattedLocation || ''),
+        address: String(loc?.streetAddress || ''),
+        city: String(loc?.city || ''),
+        state: String(loc?.stateCode || ''),
         neighborhood: null,
-        zipCode: item['location.zipCode'] ? String(item['location.zipCode']) : (item.zipCode ? String(item.zipCode) : null),
+        zipCode: loc?.zipCode ? String(loc.zipCode) : null,
         rent,
         bedrooms,
         bathrooms,
         sqft: sanitizeSqft(sqftRaw),
-        availableDate: item['activeListing.dateListed'] ? String(item['activeListing.dateListed']).split('T')[0] : null,
+        availableDate: (item.activeListing as ActiveListing | undefined)?.dateListed
+          ? String((item.activeListing as ActiveListing).dateListed).split('T')[0]
+          : null,
         amenities,
-        description: item.description ? String(item.description) : null,
-        images: Array.isArray(item.images) ? item.images.map(String) : [],
+        description: null,
+        images,
       }]
     })
   }

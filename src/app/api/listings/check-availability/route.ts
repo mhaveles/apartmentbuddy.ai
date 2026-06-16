@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
     .map(ul => ul.listing as unknown as ListingRow | null)
     .filter((l): l is ListingRow =>
       l !== null &&
-      l.is_available !== false &&
       (!l.availability_checked_at || l.availability_checked_at < oneDayAgo)
     )
     .slice(0, 30)

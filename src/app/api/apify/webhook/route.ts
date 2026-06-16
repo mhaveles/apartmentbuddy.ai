@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
           description: listing.description,
           images: listing.images,
           scraped_at: new Date().toISOString(),
+          is_available: true, // new listings are available by default; only marked false on confirmed 404
         }, { onConflict: 'external_id,source' })
         .select()
         .single()
