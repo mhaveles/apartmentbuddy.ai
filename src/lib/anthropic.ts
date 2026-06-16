@@ -71,10 +71,12 @@ Return a JSON object with:
   "reasoning": "<2-3 sentence explanation of the score, highlighting the best matches and any concerns>"
 }
 
-Location scoring rules:
+Location scoring rules (CRITICAL — read carefully):
 - Use the neighborhood field if present.
-- If neighborhood is null but address and zip_code are provided, infer the neighborhood from the street address and zip code using your knowledge of that city's geography. For example, a Denver address in zip 80218 (Capitol Hill/Cheesman Park), 80206 (Congress Park/Cherry Creek), 80209 (Washington Park), etc. Do NOT score location as 0 simply because the neighborhood field is empty — use all available location data to estimate proximity to the user's desired areas.
-- Only heavily penalize location when the address clearly places the listing in the wrong part of the city.
+- If neighborhood is null but address and/or zip_code are provided, you MUST score location using them. Do NOT write "neighborhood details are missing" or "cannot verify proximity" — that is wrong when address data is available.
+- You have detailed US city geography knowledge. Use it. Examples: Denver 80218=Capitol Hill/Cheesman Park, 80203=Capitol Hill/Uptown, 80206=Congress Park/Cherry Creek, 80209=Washington Park, 80211=Sunnyside/LoHi, 80205=Five Points/RiNo, 80220=Park Hill. NYC 10025=Upper West Side, 10014=West Village, 10003=East Village. Chicago 60614=Lincoln Park, 60657=Lakeview.
+- A listing at "777 N Corona St, Denver CO 80218" IS in Capitol Hill — score it as Capitol Hill, not as unknown.
+- Only penalize location when the address clearly places the listing in the wrong neighborhood/area.
 
 Be honest. A listing that misses a deal-breaker should score below 30.
 

@@ -31,7 +31,9 @@ type Neighborhood = Array<{ city: string; state: string; neighborhood: string; z
 
 export async function geocodeAddress(address: string, city: string, state: string): Promise<string | null> {
   try {
-    const q = encodeURIComponent(`${address}, ${city}, ${state}, USA`)
+    // Strip unit/apt numbers — "#7", "#2-213", "Apt 4B" — they confuse Nominatim
+    const street = address.replace(/#\S+/g, '').replace(/\b(apt|unit|suite|ste|#)\s*\S+/gi, '').trim()
+    const q = encodeURIComponent(`${street}, ${city}, ${state}, USA`)
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&addressdetails=1`,
       { headers: { 'User-Agent': 'ApartmentBuddy/1.0 (contact@apartmentbuddy.ai)' } }
@@ -40,7 +42,6 @@ export async function geocodeAddress(address: string, city: string, state: strin
     const data: Array<{ address?: Record<string, string> }> = await res.json()
     const addr = data[0]?.address
     if (!addr) return null
-    // Nominatim returns neighborhood under suburb, neighbourhood, quarter, or city_district
     return addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || null
   } catch {
     return null
@@ -407,7 +408,7 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
   if (source === 'trulia') {
     return items.flatMap((item, idx) => {
       // Scraper returns nested objects — access via typed casts, not flat-dotted keys
-      type Loc = { city?: string; stateCode?: string; zipCode?: string; streetAddress?: string; formattedLocation?: string }
+      type Loc = { city?: string; stateCode?: string; zipCode?: string; streetAddress?: string; formattedLocation?: string; neighborhoodName?: string | null }
       type Beds = { formattedValue?: string }
       type Floor = { formattedDimension?: string }
       type Meta = { typedHomeId?: string }
@@ -420,8 +421,6 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
       const loc = item.location as Loc | undefined
       const status = item.currentStatus as CurrentStatus | undefined
       if (status?.isActiveForRent === false) return []
-
-      if (idx === 0) console.log('TRULIA RAW ITEM[0] keys:', Object.keys(item))
 
       const tracking = Array.isArray(item.tracking) ? (item.tracking as TrackingEntry[]) : []
       const trackingMap = Object.fromEntries(tracking.map(e => [e.key, e.value]))
@@ -442,11 +441,26 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
       const bathrooms = parseFloat(bathsStr) || null
       const sqftRaw = parseInt(sqftStr.replace(/[^0-9]/g, '')) || null
 
+      // Parse tracking "item" key: "...;eightBitItem|rental:Feature:Value;..."
+      const amenities: string[] = []
+      const itemStr = trackingMap.item || ''
       const tagNames = Array.isArray(item.largeTags) ? (item.largeTags as Tag[]).map(t => t.formattedName) : []
-      const amenities: string[] = tagNames.some(t => t.includes('PET FRIENDLY')) ? ['pet_friendly'] : []
+      if (tagNames.some(t => t.includes('PET FRIENDLY')) || /Pets Allowed[^;]*Yes/i.test(itemStr))
+        amenities.push('pet_friendly')
+      const laundryMatch = itemStr.match(/rental:Laundry:([^;]+)/)
+      if (laundryMatch && !/contact manager/i.test(laundryMatch[1]))
+        amenities.push(`laundry: ${laundryMatch[1].trim()}`)
+      const parkingMatch = itemStr.match(/rental:Parking:([^;]+)/)
+      if (parkingMatch && !/contact manager/i.test(parkingMatch[1]))
+        amenities.push(`parking: ${parkingMatch[1].trim()}`)
+      if (/Utilities Included[^;]*Yes/i.test(itemStr))
+        amenities.push('utilities_included')
 
       const photos = (item.media as Media | undefined)?.photos || []
       const images = photos.map(p => p.url?.large).filter((u): u is string => !!u)
+
+      // Use neighborhoodName from scraper if available; geocoding fills it in later if null
+      const neighborhood = loc?.neighborhoodName || null
 
       return [{
         externalId,
@@ -456,7 +470,7 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
         address: String(loc?.streetAddress || ''),
         city: String(loc?.city || ''),
         state: String(loc?.stateCode || ''),
-        neighborhood: null,
+        neighborhood,
         zipCode: loc?.zipCode ? String(loc.zipCode) : null,
         rent,
         bedrooms,
