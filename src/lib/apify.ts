@@ -29,6 +29,24 @@ export interface ScrapedListing {
 type MapBounds = { north: number; south: number; east: number; west: number }
 type Neighborhood = Array<{ city: string; state: string; neighborhood: string; zip_code?: string | null; map_bounds?: MapBounds | null }>
 
+export async function geocodeAddress(address: string, city: string, state: string): Promise<string | null> {
+  try {
+    const q = encodeURIComponent(`${address}, ${city}, ${state}, USA`)
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&addressdetails=1`,
+      { headers: { 'User-Agent': 'ApartmentBuddy/1.0 (contact@apartmentbuddy.ai)' } }
+    )
+    if (!res.ok) return null
+    const data: Array<{ address?: Record<string, string> }> = await res.json()
+    const addr = data[0]?.address
+    if (!addr) return null
+    // Nominatim returns neighborhood under suburb, neighbourhood, quarter, or city_district
+    return addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || null
+  } catch {
+    return null
+  }
+}
+
 export async function geocodeZip(zip: string): Promise<MapBounds | null> {
   try {
     const res = await fetch(

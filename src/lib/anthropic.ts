@@ -71,6 +71,11 @@ Return a JSON object with:
   "reasoning": "<2-3 sentence explanation of the score, highlighting the best matches and any concerns>"
 }
 
+Location scoring rules:
+- Use the neighborhood field if present.
+- If neighborhood is null but address and zip_code are provided, infer the neighborhood from the street address and zip code using your knowledge of that city's geography. For example, a Denver address in zip 80218 (Capitol Hill/Cheesman Park), 80206 (Congress Park/Cherry Creek), 80209 (Washington Park), etc. Do NOT score location as 0 simply because the neighborhood field is empty — use all available location data to estimate proximity to the user's desired areas.
+- Only heavily penalize location when the address clearly places the listing in the wrong part of the city.
+
 Be honest. A listing that misses a deal-breaker should score below 30.
 
 Respond with ONLY the JSON object. No explanation, no markdown, no code fences.`

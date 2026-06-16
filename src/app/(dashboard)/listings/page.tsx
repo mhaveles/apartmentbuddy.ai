@@ -13,6 +13,7 @@ export default function ListingsPage() {
   const [searchTimedOut, setSearchTimedOut] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [scraperWarnings, setScraperWarnings] = useState<string[]>([])
+  const [rescoring, setRescoring] = useState(false)
   const pollStartRef = useRef<number | null>(null)
 
   const loadListings = useCallback(async () => {
@@ -96,6 +97,18 @@ export default function ListingsPage() {
     setSearchStatus(null)
   }
 
+  async function rescoreListings() {
+    setRescoring(true)
+    await fetch('/api/listings/rescore', { method: 'POST' })
+    // Scoring runs in background — poll until scores change or 90s passes
+    const start = Date.now()
+    const poll = setInterval(async () => {
+      if (Date.now() - start > 90_000) { clearInterval(poll); setRescoring(false); return }
+      await loadListings()
+    }, 4000)
+    setTimeout(() => { clearInterval(poll); setRescoring(false); loadListings() }, 90_000)
+  }
+
   async function runSearch() {
     setSearching(true)
     setSearchStatus('running')
@@ -149,6 +162,13 @@ export default function ListingsPage() {
             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${savedOnly ? 'bg-indigo-600 text-white' : 'border border-gray-300 text-gray-600'}`}
           >
             {savedOnly ? 'All listings' : 'Saved only'}
+          </button>
+          <button
+            onClick={rescoreListings}
+            disabled={rescoring || searching}
+            className="border border-gray-300 text-gray-600 px-4 py-1.5 rounded-lg text-sm font-medium hover:border-gray-400 disabled:opacity-50"
+          >
+            {rescoring ? 'Re-scoring…' : 'Re-score'}
           </button>
           <button
             onClick={runSearch}

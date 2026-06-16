@@ -154,13 +154,16 @@ export async function POST(req: NextRequest) {
                 messages: [{
                   role: 'user',
                   content: `User preferences:\n${JSON.stringify(preferences, null, 2)}\n\nListing:\n${JSON.stringify({
+                    address: listing.address,
+                    zip_code: listing.zipCode,
+                    neighborhood: listing.neighborhood,
+                    city: listing.city,
+                    state: listing.state,
                     rent: listing.rent / 100,
                     bedrooms: listing.bedrooms,
                     bathrooms: listing.bathrooms,
                     sqft: listing.sqft,
                     amenities: listing.amenities,
-                    neighborhood: listing.neighborhood,
-                    city: listing.city,
                     description: listing.description,
                   }, null, 2)}`,
                 }],
