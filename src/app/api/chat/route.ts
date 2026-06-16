@@ -99,6 +99,24 @@ export async function POST(req: NextRequest) {
         } else {
           preferencesExtracted = true
         }
+
+        // Sync neighborhoods: replace all active neighborhoods with the newly extracted ones
+        type NeighborhoodInput = { neighborhood: string; city: string; state: string; zip_code?: string | null }
+        const extractedNeighborhoods: NeighborhoodInput[] = Array.isArray(prefs.neighborhoods) ? prefs.neighborhoods : []
+        if (extractedNeighborhoods.length > 0) {
+          await supabase.from('monitored_neighborhoods').delete().eq('user_id', user.id)
+          const { error: neighborhoodError } = await supabase
+            .from('monitored_neighborhoods')
+            .insert(extractedNeighborhoods.map(n => ({
+              user_id: user.id,
+              neighborhood: n.neighborhood,
+              city: n.city,
+              state: n.state.toUpperCase(),
+              zip_code: n.zip_code || null,
+              active: true,
+            })))
+          if (neighborhoodError) console.error('Neighborhoods upsert error:', neighborhoodError)
+        }
       } catch (parseErr) {
         console.error('Preferences parse error:', parseErr)
       }

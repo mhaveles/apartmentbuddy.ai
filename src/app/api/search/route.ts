@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { startCraigslistScrape, startTruliaScrape /*, startZillowDetailScrape, startApartmentsComScrape */ } from '@/lib/apify'
+import { startCraigslistScrape, startZillowScrape, startTruliaScrape /*, startApartmentsComScrape */ } from '@/lib/apify'
 import { FREE_SEARCH_LIMIT } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
@@ -84,23 +84,24 @@ export async function POST(req: NextRequest) {
 
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/apify/webhook?secret=${process.env.CRON_SECRET}`
 
-  const [craigslistResult, truliaResult] = await Promise.allSettled([
+  const [craigslistResult, zillowResult, truliaResult] = await Promise.allSettled([
     startCraigslistScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
+    startZillowScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
     startTruliaScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
-    // startZillowDetailScrape(neighborhoods, webhookUrl, searchRun.id),
     // startApartmentsComScrape(neighborhoods, webhookUrl, searchRun.id),
   ])
 
   const runIds = {
     craigslist: craigslistResult.status === 'fulfilled' ? craigslistResult.value : null,
+    zillow: zillowResult.status === 'fulfilled' ? zillowResult.value : null,
     trulia: truliaResult.status === 'fulfilled' ? truliaResult.value : null,
-    // zillow: zillowResult.status === 'fulfilled' ? zillowResult.value : null,
   }
 
   const successfulStarts = Object.values(runIds).filter(Boolean).length
 
   const failures = [
     craigslistResult.status === 'rejected' ? `craigslist: ${(craigslistResult.reason as Error).message}` : null,
+    zillowResult.status === 'rejected' ? `zillow: ${(zillowResult.reason as Error).message}` : null,
     truliaResult.status === 'rejected' ? `trulia: ${(truliaResult.reason as Error).message}` : null,
   ].filter(Boolean) as string[]
 
@@ -161,6 +162,23 @@ export async function GET(req: NextRequest) {
       .eq('id', searchRunId)
       .eq('user_id', user.id)
       .single()
+
+    // Auto-recover stale runs: if all actors reported back but status wasn't updated
+    // (race condition or webhook failure), resolve it now rather than leaving UI stuck.
+    if (data && (data.status === 'running' || data.status === 'pending')) {
+      const staleAt = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+      const isStale = data.started_at < staleAt
+      const allActorsDone = (data.apify_runs_pending as number) === 0
+      if (allActorsDone || isStale) {
+        const resolvedStatus = allActorsDone ? 'completed' : 'failed'
+        await supabase
+          .from('search_runs')
+          .update({ status: resolvedStatus, completed_at: new Date().toISOString() })
+          .eq('id', searchRunId)
+        return NextResponse.json({ ...data, status: resolvedStatus })
+      }
+    }
+
     return NextResponse.json(data)
   }
 

@@ -218,8 +218,12 @@ export async function startTruliaScrape(
   preferences?: { max_rent?: number | null; min_bedrooms?: number | null; max_bedrooms?: number | null; min_bathrooms?: number | null; pet_friendly?: boolean | null; in_unit_laundry?: boolean | null; air_conditioning?: boolean | null; gym?: boolean | null; parking_required?: boolean | null }
 ): Promise<string> {
   const first = neighborhoods[0]
-  // Prefer ZIP code — more targeted than city name (actor accepts city, ZIP, or neighborhood)
-  const location = first.zip_code || `${first.city}, ${first.state.toUpperCase()}`
+  // Prefer zip code for precise targeting; fall back to neighborhood then city
+  const location = first.zip_code
+    ? first.zip_code
+    : first.neighborhood
+      ? `${first.neighborhood}, ${first.city}, ${first.state.toUpperCase()}`
+      : `${first.city}, ${first.state.toUpperCase()}`
 
   const pets: string[] = preferences?.pet_friendly ? ['cats', 'large_dogs'] : []
   const unitAmenities: string[] = preferences?.in_unit_laundry ? ['washerdryer'] : []
@@ -235,6 +239,10 @@ export async function startTruliaScrape(
     space: 'entire_space',
     maxItems: 50,
     includeOffMarket: false,
+    proxyConfiguration: {
+      useApifyProxy: true,
+      apifyProxyGroups: ['RESIDENTIAL'],
+    },
     ...(preferences?.air_conditioning        && { airConditioning: true }),
     ...(preferences?.max_rent                && { maxPrice: Math.round(preferences.max_rent / 100) }),
     ...(preferences?.min_bedrooms  != null   && { minBeds:  preferences.min_bedrooms }),
@@ -366,30 +374,24 @@ function mapListings(items: Record<string, unknown>[], source: string): ScrapedL
       // Skip non-rental or inactive listings
       if (!item['currentStatus.isActiveForRent']) return []
 
-      // Build a lookup from the tracking key-value array
       type TrackingEntry = { key: string; value: string }
       const tracking = Array.isArray(item.tracking) ? (item.tracking as TrackingEntry[]) : []
       const trackingMap = Object.fromEntries(tracking.map(e => [e.key, e.value]))
 
-      // Stable ID: zPID from tracking, fall back to stripping _ZPID suffix from typedHomeId
       const externalId = trackingMap.zPID || String(item['metadata.typedHomeId'] || '').replace('_ZPID', '')
       if (!externalId) return []
 
-      // listingPrice in tracking is a clean dollar integer string ("3000")
       const rent = Math.round((parseFloat(trackingMap.listingPrice || '0') || 0) * 100)
-
-      // "2bd" → 2, "6bd" → 6
       const bedrooms = parseInt(String(item['bedrooms.formattedValue'] || '')) || null
-      // "2ba" → 2, "4.5ba" → 4.5 — parseFloat stops at the 'b'
       const bathrooms = parseFloat(String(item['bathrooms.formattedValue'] || '')) || null
-
-      // "1,271 sqft" → strip commas + letters → 1271
       const sqftRaw = parseInt(String(item['floorSpace.formattedDimension'] || '').replace(/[^0-9]/g, '')) || null
 
-      // Amenities surfaced via largeTags (pet friendly is the main one in list view)
       type Tag = { formattedName: string }
-      const tagNames = Array.isArray(item.largeTags) ? (item.largeTags as Tag[]).map(tag => tag.formattedName) : []
-      const amenities: string[] = tagNames.some(tag => tag.includes('PET FRIENDLY')) ? ['pet_friendly'] : []
+      const tagNames = Array.isArray(item.largeTags) ? (item.largeTags as Tag[]).map(t => t.formattedName) : []
+      const amenities: string[] = tagNames.some(t => t.includes('PET FRIENDLY')) ? ['pet_friendly'] : []
+
+      // Log first raw item so we can verify field mapping after first successful run
+      if (items.indexOf(item) === 0) console.log('TRULIA RAW ITEM:', JSON.stringify(item, null, 2))
 
       return [{
         externalId,
