@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { startCraigslistScrape, startZillowScrape, startTruliaScrape /*, startApartmentsComScrape */ } from '@/lib/apify'
+import { startCraigslistScrape, startZillowScrape, startTruliaScrape } from '@/lib/apify'
 import { FREE_SEARCH_LIMIT } from '@/lib/stripe'
 
 export async function POST(req: NextRequest) {
@@ -88,7 +88,6 @@ export async function POST(req: NextRequest) {
     startCraigslistScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
     startZillowScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
     startTruliaScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
-    // startApartmentsComScrape(neighborhoods, webhookUrl, searchRun.id),
   ])
 
   const runIds = {

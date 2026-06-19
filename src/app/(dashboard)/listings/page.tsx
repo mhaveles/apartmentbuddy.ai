@@ -99,6 +99,7 @@ export default function ListingsPage() {
 
   async function rescoreListings() {
     setRescoring(true)
+    await checkAvailability() // clear dead listings before re-scoring
     await fetch('/api/listings/rescore', { method: 'POST' })
     // Scoring runs in background — poll until scores change or 90s passes
     const start = Date.now()
