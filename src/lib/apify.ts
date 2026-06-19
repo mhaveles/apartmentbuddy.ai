@@ -112,27 +112,21 @@ export async function startZillowScrape(
     gym?: boolean | null
   }
 ): Promise<string> {
-  // actor: igolaizola/zillow-scraper-ppe — takes a plain location string + boolean amenity flags.
-  // Use the most specific location we have: zip > "Neighborhood, City, ST" > "City, ST".
+  // actor: igolaizola/zillow-scraper-ppe — pass a Zillow rentals URL as startUrls to
+  // target rental listings directly and bypass the for-sale default behavior.
   const first = neighborhoods[0]
-  const location = first.zip_code
-    ? first.zip_code
-    : first.neighborhood
-      ? `${first.neighborhood}, ${first.city}, ${first.state.toUpperCase()}`
-      : `${first.city}, ${first.state.toUpperCase()}`
+  const citySlug = first.city.toLowerCase().replace(/\s+/g, '-')
+  const stateSlug = first.state.toLowerCase()
+  const locationSlug = first.zip_code
+    ? `${citySlug}-${stateSlug}-${first.zip_code}`
+    : `${citySlug}-${stateSlug}`
+  const rentalUrl = `https://www.zillow.com/${locationSlug}/rentals/`
 
   return startActor('igolaizola/zillow-scraper-ppe', {
-    location,
+    startUrls: [{ url: rentalUrl }],
     fetchDetails: true,
     flattenOutput: true,
     maxItems: 50,
-    // Restrict to rental listings only — without this the actor returns for-sale listings
-    homeStatus: ['FOR_RENT'],
-    listingType: 'RENT',
-    // Boolean amenity flags from user preferences
-    ...(preferences?.air_conditioning  && { airConditioning: true }),
-    ...(preferences?.in_unit_laundry   && { inUnitLaundry: true }),
-    ...(preferences?.parking_required  && { garage: true, onSiteParking: true }),
   }, buildWebhooks(webhookUrl, searchRunId, 'zillow'))
 }
 
@@ -204,19 +198,14 @@ export async function startCraigslistScrape(
   preferences?: { max_rent?: number | null; min_bedrooms?: number | null; max_bedrooms?: number | null; pet_friendly?: boolean | null }
 ): Promise<string> {
   const first = neighborhoods[0]
-  // Use the neighborhood name as the search query for geographic relevance.
-  // Also pass price/bedroom params — the actor claims to support price filtering;
-  // if supported these pre-filter results before they reach us.
+  // Use a geographic search URL instead of text searchQueries — this finds all apartments
+  // in the zip code radius rather than doing a keyword match which returns very few results.
+  const searchUrl = buildCraigslistUrl(first, preferences)
+  console.log(`[CRAIGSLIST] search URL: ${searchUrl}`)
   return startActor('automation-lab/craigslist-scraper', {
-    category: 'housing',
-    city: first.city,
+    startUrls: [{ url: searchUrl }],
     includeDetails: true,
     maxResults: 100,
-    searchQueries: [first.neighborhood || 'apartment'],
-    ...(preferences?.max_rent     && { maxPrice:    Math.round(preferences.max_rent / 100) }),
-    ...(preferences?.min_bedrooms && { minBedrooms: preferences.min_bedrooms }),
-    ...(preferences?.max_bedrooms && { maxBedrooms: preferences.max_bedrooms }),
-    ...(preferences?.pet_friendly && { pets: true }),
   }, buildWebhooks(webhookUrl, searchRunId, 'craigslist'))
 }
 

@@ -71,13 +71,19 @@ Return a JSON object with:
   "reasoning": "<2-3 sentence explanation of the score, highlighting the best matches and any concerns>"
 }
 
-Location scoring rules (CRITICAL — read carefully):
+Missing data rules (CRITICAL):
+- If a feature the user wants is NOT mentioned in the listing, assume it MAY be present. Only deduct points if the listing EXPLICITLY states it lacks something (e.g. "no pets", "street parking only", "shared laundry").
+- Score amenities 50 when no amenity data is available — unknown is not the same as absent.
+- A listing with good price, location, and size but sparse amenity data should still score 70+. Only score below 40 if the listing explicitly violates a deal-breaker.
+- Never write "cannot confirm" or "details missing" in your reasoning as a reason to lower the score — absence of data is neutral, not negative.
+
+Location scoring rules (CRITICAL):
 - Use the neighborhood field if present.
 - If neighborhood is null but address and/or zip_code are provided, you MUST score location using them. Do NOT write "neighborhood details are missing" or "cannot verify proximity" — that is wrong when address data is available.
 - You have detailed US city geography knowledge. Use it. Examples: Denver 80218=Capitol Hill/Cheesman Park, 80203=Capitol Hill/Uptown, 80206=Congress Park/Cherry Creek, 80209=Washington Park, 80211=Sunnyside/LoHi, 80205=Five Points/RiNo, 80220=Park Hill. NYC 10025=Upper West Side, 10014=West Village, 10003=East Village. Chicago 60614=Lincoln Park, 60657=Lakeview.
 - A listing at "777 N Corona St, Denver CO 80218" IS in Capitol Hill — score it as Capitol Hill, not as unknown.
 - Only penalize location when the address clearly places the listing in the wrong neighborhood/area.
 
-Be honest. A listing that misses a deal-breaker should score below 30.
+A listing that explicitly violates a deal-breaker (wrong city, over budget, wrong bed count) should score below 30.
 
 Respond with ONLY the JSON object. No explanation, no markdown, no code fences.`
