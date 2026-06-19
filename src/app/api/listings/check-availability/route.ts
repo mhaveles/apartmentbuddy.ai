@@ -5,15 +5,24 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 export const maxDuration = 30
 
 async function isUrlAvailable(url: string): Promise<boolean> {
+  const isCraigslist = url.includes('craigslist.org')
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 5000)
   try {
     const res = await fetch(url, {
-      method: 'HEAD',
+      method: isCraigslist ? 'GET' : 'HEAD',
       signal: controller.signal,
       redirect: 'follow',
     })
-    return res.status !== 404
+    if (res.status === 404) return false
+    if (isCraigslist) {
+      const html = await res.text()
+      // Craigslist returns 200 for expired/deleted/flagged posts instead of 404
+      if (/this posting has (been deleted|expired|been flagged)/i.test(html)) {
+        return false
+      }
+    }
+    return true
   } catch {
     return true // network/timeout errors — assume still available
   } finally {
@@ -27,7 +36,8 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const oneDayAgo  = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const oneHourAgo = new Date(Date.now() -       60 * 60 * 1000).toISOString()
 
   const { data: userListings } = await supabase
     .from('user_listings')
@@ -43,10 +53,12 @@ export async function POST(req: NextRequest) {
 
   const toCheck = userListings
     .map(ul => ul.listing as unknown as ListingRow | null)
-    .filter((l): l is ListingRow =>
-      l !== null &&
-      (!l.availability_checked_at || l.availability_checked_at < oneDayAgo)
-    )
+    .filter((l): l is ListingRow => {
+      if (!l) return false
+      // Craigslist checks were broken before this fix — use 1h throttle so they recheck promptly
+      const cutoff = l.url.includes('craigslist.org') ? oneHourAgo : oneDayAgo
+      return !l.availability_checked_at || l.availability_checked_at < cutoff
+    })
     .slice(0, 30)
 
   if (toCheck.length === 0) {
