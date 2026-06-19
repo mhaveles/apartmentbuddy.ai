@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const oneDayAgo  = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const oneHourAgo = new Date(Date.now() -       60 * 60 * 1000).toISOString()
 
   const { data: userListings } = await supabase
     .from('user_listings')
@@ -52,10 +53,12 @@ export async function POST(req: NextRequest) {
 
   const toCheck = userListings
     .map(ul => ul.listing as unknown as ListingRow | null)
-    .filter((l): l is ListingRow =>
-      l !== null &&
-      (!l.availability_checked_at || l.availability_checked_at < oneDayAgo)
-    )
+    .filter((l): l is ListingRow => {
+      if (!l) return false
+      // Craigslist checks broke before this fix — use 1h throttle so they recheck quickly
+      const cutoff = l.url.includes('craigslist.org') ? oneHourAgo : oneDayAgo
+      return !l.availability_checked_at || l.availability_checked_at < cutoff
+    })
     .slice(0, 30)
 
   if (toCheck.length === 0) {
