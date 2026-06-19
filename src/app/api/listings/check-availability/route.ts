@@ -5,15 +5,24 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 export const maxDuration = 30
 
 async function isUrlAvailable(url: string): Promise<boolean> {
+  const isCraigslist = url.includes('craigslist.org')
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 5000)
   try {
     const res = await fetch(url, {
-      method: 'HEAD',
+      method: isCraigslist ? 'GET' : 'HEAD',
       signal: controller.signal,
       redirect: 'follow',
     })
-    return res.status !== 404
+    if (res.status === 404) return false
+    if (isCraigslist) {
+      const html = await res.text()
+      // Craigslist returns 200 for expired/deleted posts — detect via body text
+      if (/this posting has (been deleted|expired|been flagged)/i.test(html)) {
+        return false
+      }
+    }
+    return true
   } catch {
     return true // network/timeout errors — assume still available
   } finally {
