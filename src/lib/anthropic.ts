@@ -6,6 +6,46 @@ export function getAnthropic(): Anthropic {
   return _client ?? (_client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }))
 }
 
+type SupportedMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+const SUPPORTED_MEDIA_TYPES: SupportedMediaType[] = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+
+export type ImageBlock = {
+  type: 'image'
+  source: { type: 'base64'; media_type: SupportedMediaType; data: string }
+}
+
+// Fetches listing images and encodes as base64 so Anthropic doesn't need to fetch URLs
+// (bypasses the 100 req/min URL Content Fetching rate limit).
+// Floor plan URLs are prioritized — they appear later in listing photo arrays but are
+// extremely valuable for layout scoring.
+export async function fetchListingImages(urls: string[], maxImages = 5): Promise<ImageBlock[]> {
+  const floorPlanUrls = urls.filter(u => /floor.?plan|floorplan/i.test(u))
+  const photoUrls = urls.filter(u => !/floor.?plan|floorplan/i.test(u))
+  const selected = [...floorPlanUrls.slice(0, 1), ...photoUrls].slice(0, maxImages)
+
+  const results = await Promise.all(selected.map(async (url): Promise<ImageBlock | null> => {
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ApartmentBuddy/1.0)' },
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!res.ok) return null
+      const raw = (res.headers.get('content-type') || 'image/jpeg').split(';')[0].trim()
+      if (!(SUPPORTED_MEDIA_TYPES as string[]).includes(raw)) return null
+      const mediaType = raw as SupportedMediaType
+      const buffer = await res.arrayBuffer()
+      return {
+        type: 'image',
+        source: { type: 'base64', media_type: mediaType, data: Buffer.from(buffer).toString('base64') },
+      }
+    } catch {
+      return null
+    }
+  }))
+
+  return results.filter((r): r is ImageBlock => r !== null)
+}
+
 export const SYSTEM_PROMPT = `You are ApartmentBuddy, a friendly and knowledgeable AI assistant that helps people find their perfect apartment. Your goal is to understand what makes a living space ideal for them — not just for the next few months, but for 2+ years.
 
 You ask thoughtful questions to uncover:
@@ -71,9 +111,26 @@ Return a JSON object with:
   "reasoning": "<2-3 sentence explanation of the score, highlighting the best matches and any concerns>"
 }
 
+Photo analysis rules (when images are provided):
+- Analyze all provided images carefully. They directly improve scoring accuracy — prioritize what you can see over sparse text data.
+- Floor plans (architectural drawings/diagrams): these are extremely valuable. Use them to assess true layout, room count, flow, and whether there is space for a home office if the user works from home.
+- For SIZE: if a floor plan is present, use it as primary evidence for layout and sq footage feel. If photos show cramped or unusually spacious rooms, adjust the size score accordingly.
+- For AMENITIES: visible evidence in photos overrides or supplements the text amenity list. Look for:
+  - In-unit washer/dryer (look in closets, utility areas, kitchen corners)
+  - Parking (garage, carport, dedicated space visible)
+  - Gym / fitness equipment room
+  - Outdoor space: balcony, patio, yard, rooftop deck
+  - Pool
+  - Natural light: large windows, bright rooms vs dark/basement feel
+  - Kitchen quality: updated appliances, counter space, open layout
+  - Storage: closets, built-ins
+  - Ground floor or basement unit (a deal-breaker for many users)
+- If photos show a clear mismatch with user needs (e.g., no outdoor space visible when user requires it, clearly tiny rooms when user wants spacious), lower the relevant dimension score.
+- If photos confirm amenities the user wants, raise the amenities score even if the text data didn't list them.
+- If no images are provided, score amenities 50 when no text amenity data is available — unknown is not the same as absent.
+
 Missing data rules (CRITICAL):
-- If a feature the user wants is NOT mentioned in the listing, assume it MAY be present. Only deduct points if the listing EXPLICITLY states it lacks something (e.g. "no pets", "street parking only", "shared laundry").
-- Score amenities 50 when no amenity data is available — unknown is not the same as absent.
+- If a feature the user wants is NOT mentioned in the listing, assume it MAY be present. Only deduct points if the listing EXPLICITLY states it lacks something (e.g. "no pets", "street parking only", "shared laundry") OR if photos clearly show its absence.
 - A listing with good price, location, and size but sparse amenity data should still score 70+. Only score below 40 if the listing explicitly violates a deal-breaker.
 - Never write "cannot confirm" or "details missing" in your reasoning as a reason to lower the score — absence of data is neutral, not negative.
 

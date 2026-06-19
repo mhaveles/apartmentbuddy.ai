@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchScrapedListingsByRunId } from '@/lib/apify'
-import { getAnthropic, SCORING_PROMPT } from '@/lib/anthropic'
+import { getAnthropic, SCORING_PROMPT, fetchListingImages } from '@/lib/anthropic'
 
 export const maxDuration = 60
 
@@ -146,26 +146,31 @@ export async function POST(req: NextRequest) {
           if (existing) return 0
 
           try {
+            const imageBlocks = await fetchListingImages(listing.images || [], 5)
+            const textContent = `User preferences:\n${JSON.stringify(preferences, null, 2)}\n\nListing:\n${JSON.stringify({
+              address: listing.address,
+              zip_code: listing.zipCode,
+              neighborhood: listing.neighborhood,
+              city: listing.city,
+              state: listing.state,
+              rent: listing.rent / 100,
+              bedrooms: listing.bedrooms,
+              bathrooms: listing.bathrooms,
+              sqft: listing.sqft,
+              amenities: listing.amenities,
+              description: listing.description,
+            }, null, 2)}`
+
+            const messageContent = [
+              ...imageBlocks,
+              { type: 'text' as const, text: textContent },
+            ]
+
             const scoreResponse = await getAnthropic().messages.create({
               model: 'claude-haiku-4-5-20251001',
-              max_tokens: 512,
+              max_tokens: 768,
               system: SCORING_PROMPT,
-              messages: [{
-                role: 'user',
-                content: `User preferences:\n${JSON.stringify(preferences, null, 2)}\n\nListing:\n${JSON.stringify({
-                  address: listing.address,
-                  zip_code: listing.zipCode,
-                  neighborhood: listing.neighborhood,
-                  city: listing.city,
-                  state: listing.state,
-                  rent: listing.rent / 100,
-                  bedrooms: listing.bedrooms,
-                  bathrooms: listing.bathrooms,
-                  sqft: listing.sqft,
-                  amenities: listing.amenities,
-                  description: listing.description,
-                }, null, 2)}`,
-              }],
+              messages: [{ role: 'user', content: messageContent }],
             })
 
             const rawText = scoreResponse.content[0].type === 'text' ? scoreResponse.content[0].text : '{}'
