@@ -112,21 +112,22 @@ export async function startZillowScrape(
     gym?: boolean | null
   }
 ): Promise<string> {
-  // actor: igolaizola/zillow-scraper-ppe — pass a Zillow rentals URL as startUrls to
-  // target rental listings directly and bypass the for-sale default behavior.
+  // igolaizola/zillow-scraper-ppe uses `operation` + `location` (not startUrls).
+  // Default operation is "buy"; must set "rent" explicitly or it returns for-sale listings.
   const first = neighborhoods[0]
-  const citySlug = first.city.toLowerCase().replace(/\s+/g, '-')
-  const stateSlug = first.state.toLowerCase()
-  const locationSlug = first.zip_code
-    ? `${citySlug}-${stateSlug}-${first.zip_code}`
-    : `${citySlug}-${stateSlug}`
-  const rentalUrl = `https://www.zillow.com/${locationSlug}/rentals/`
+  const location = first.zip_code
+    ? first.zip_code
+    : `${first.city}, ${first.state.toUpperCase()}`
 
   return startActor('igolaizola/zillow-scraper-ppe', {
-    startUrls: [{ url: rentalUrl }],
+    operation: 'rent',
+    location,
     fetchDetails: true,
     flattenOutput: true,
     maxItems: 50,
+    ...(preferences?.min_bedrooms  != null && { minBeds:  preferences.min_bedrooms }),
+    ...(preferences?.min_bathrooms != null && { minBaths: Math.floor(preferences.min_bathrooms) }),
+    ...(preferences?.max_rent           && { maxPrice: Math.round(preferences.max_rent / 100) }),
   }, buildWebhooks(webhookUrl, searchRunId, 'zillow'))
 }
 

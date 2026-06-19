@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       if (!searchRun) continue
 
       const [zillowRunId, apartmentsRunId] = await Promise.all([
-        startZillowScrape(neighborhoods, webhookUrl, searchRun.id),
+        startZillowScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
         startApartmentsComScrape(neighborhoods, webhookUrl, searchRun.id),
       ])
 
