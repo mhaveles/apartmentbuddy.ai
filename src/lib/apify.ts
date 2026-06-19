@@ -126,6 +126,9 @@ export async function startZillowScrape(
     fetchDetails: true,
     flattenOutput: true,
     maxItems: 50,
+    // Restrict to rental listings only — without this the actor returns for-sale listings
+    homeStatus: ['FOR_RENT'],
+    listingType: 'RENT',
     // Boolean amenity flags from user preferences
     ...(preferences?.air_conditioning  && { airConditioning: true }),
     ...(preferences?.in_unit_laundry   && { inUnitLaundry: true }),
@@ -305,7 +308,14 @@ function validateZillowItem(item: Record<string, unknown>): ScrapedListing | nul
   const city          = item['address.city']          || item.city          || ''
   const state         = item['address.state']         || item.state         || ''
   const zipCode       = item['address.zipcode']       || item.zipcode       || item.zipCode || null
-  const price         = Number(item['price.value']    || 0)
+  const priceRaw      = Number(item['price.value']    || 0)
+  // Drop for-sale listings: monthly rents in Denver are under $10k; values above that are sale prices.
+  // The actor may return mixed listing types regardless of homeStatus filter.
+  if (priceRaw > 10000) {
+    console.log(`[ZILLOW] dropping likely sale listing zpid=${zpid} price=${priceRaw}`)
+    return null
+  }
+  const price         = priceRaw
   const beds          = item.bedrooms   ?? null
   const baths         = item.bathrooms  ?? null
   const sqftRaw       = item.livingArea ?? null
