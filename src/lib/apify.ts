@@ -279,210 +279,294 @@ function sanitizeSqft(val: number | null | undefined): number | null {
   return n
 }
 
+function logRawSample(source: string, item: Record<string, unknown>): void {
+  console.log(`[${source.toUpperCase()}] RAW ITEM:`, JSON.stringify(item, null, 2))
+}
+
+function isScoreable(listing: ScrapedListing): boolean {
+  const issues: string[] = []
+  if (!listing.externalId)                issues.push('missing externalId')
+  if (!listing.url)                       issues.push('missing url')
+  if (listing.rent === 0)                 issues.push('rent is 0')
+  if (!listing.city && !listing.address)  issues.push('no location')
+  if (issues.length) {
+    console.warn(`[${listing.source}] dropping unscorable listing: ${issues.join(', ')}`)
+    return false
+  }
+  return true
+}
+
+function validateZillowItem(item: Record<string, unknown>): ScrapedListing | null {
+  // igolaizola/zillow-scraper-ppe with flattenOutput:true returns dot-notation keys
+  const zpid = item.zpid || item['hdpData.homeInfo.zpid'] || item.id
+  if (!zpid) return null
+
+  const streetAddress = item['address.streetAddress'] || item.streetAddress || item.address || ''
+  const city          = item['address.city']          || item.city          || ''
+  const state         = item['address.state']         || item.state         || ''
+  const zipCode       = item['address.zipcode']       || item.zipcode       || item.zipCode || null
+  const price         = Number(item['price.value']    || 0)
+  const beds          = item.bedrooms   ?? null
+  const baths         = item.bathrooms  ?? null
+  const sqftRaw       = item.livingArea ?? null
+  const detailUrl     = String(item.url || item.hdpUrl || '')
+  const desc          = item['_details.description'] ? String(item['_details.description']) : null
+  const rawPhotos     = item['media.allPropertyPhotos.highResolution']
+  const imgs: string[] = Array.isArray(rawPhotos) ? rawPhotos.map(String) : []
+
+  // Extract amenities from resoFacts (requires fetchDetails:true).
+  // Log the full object on first appearance — exact subfield names vary; confirmed names get added here.
+  const resoFacts = item['_details.resoFacts'] as Record<string, unknown> | undefined
+  if (resoFacts) console.log('[ZILLOW] resoFacts:', JSON.stringify(resoFacts, null, 2))
+  const amenities: string[] = []
+  if (resoFacts?.hasPetsAllowed)                           amenities.push('pet_friendly')
+  if (resoFacts?.hasGarage || resoFacts?.parkingFeatures)  amenities.push('parking')
+  if (resoFacts?.laundryFeatures)                          amenities.push(`laundry: ${resoFacts.laundryFeatures}`)
+  // Fallback: scan description for common amenity signals when resoFacts is absent
+  const descLower = (desc || '').toLowerCase()
+  if (!amenities.some(a => a.includes('laundry')) && /in.unit.laundry|washer.?dryer/i.test(descLower))
+    amenities.push('laundry: in-unit')
+  if (!amenities.includes('pet_friendly') && /pets?\s+(ok|allowed|friendly|welcome)/i.test(descLower))
+    amenities.push('pet_friendly')
+  if (!amenities.includes('parking') && /parking\s+(included|available|garage)/i.test(descLower))
+    amenities.push('parking')
+
+  const bedsLabel  = beds  != null ? `${beds}bd`  : ''
+  const bathsLabel = baths != null ? `${baths}ba` : ''
+  const title = String([bedsLabel, bathsLabel].filter(Boolean).join(' ') || streetAddress)
+
+  return {
+    externalId: String(zpid),
+    source: 'zillow',
+    url: detailUrl,
+    title,
+    address: String(streetAddress),
+    city: String(city),
+    state: String(state),
+    neighborhood: item.neighborhood ? String(item.neighborhood) : null,
+    zipCode: zipCode ? String(zipCode) : null,
+    rent: Math.round(price * 100),
+    bedrooms:  beds  != null ? Number(beds)  : null,
+    bathrooms: baths != null ? Number(baths) : null,
+    sqft: sanitizeSqft(sqftRaw as number | null),
+    availableDate: null,
+    amenities,
+    description: desc,
+    images: imgs,
+  }
+}
+
+function validateApartmentsComItem(item: Record<string, unknown>): ScrapedListing | null {
+  // parseforge/apartments-com-scraper returns no id/propertyId field — use url as stable key
+  const externalId = String(item.url || '')
+  if (!externalId) return null
+
+  // Actor returns imageUrl (singular string), not a photos array
+  const imageUrl = item.imageUrl ? String(item.imageUrl) : null
+
+  return {
+    externalId,
+    source: 'apartments_com',
+    url: String(item.url || ''),
+    title: String(item.propertyName || item.name || item.title || ''),
+    address: String(item.address || ''),
+    city: String(item.city || ''),
+    state: String(item.state || ''),
+    neighborhood: null,
+    zipCode: item.zipCode ? String(item.zipCode) : null,
+    // Actor returns rentMin/rentMax (not minRent/rent); use lower bound for comparison
+    rent: Math.round((Number(item.rentMin ?? item.minRent ?? item.rent) || 0) * 100),
+    // Actor returns bedroomsMin/bedroomsMax (not beds)
+    bedrooms: item.bedroomsMin != null ? Number(item.bedroomsMin) : (item.beds != null ? Number(item.beds) : null),
+    bathrooms: item.bathrooms != null ? Number(item.bathrooms) : null,
+    // Actor returns sqftMin/sqftMax (not sqft)
+    sqft: sanitizeSqft((item.sqftMin ?? item.sqft) as number | null),
+    availableDate: item.availableDate ? String(item.availableDate) : null,
+    amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
+    description: item.description ? String(item.description) : null,
+    images: imageUrl ? [imageUrl] : (Array.isArray(item.photos) ? item.photos.map(String) : []),
+  }
+}
+
+function validateCraigslistItem(item: Record<string, unknown>): ScrapedListing | null {
+  // automation-lab/craigslist-scraper uses listingId (not id/postId)
+  const postId = item.listingId || item.id || item.postId
+  if (!postId) return null
+
+  // Drop posts older than 30 days — Craigslist keeps URLs alive but content is gone
+  const postedAt = item.postedAt ? String(item.postedAt) : null
+  if (postedAt) {
+    const posted = new Date(postedAt)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    if (posted < thirtyDaysAgo) {
+      console.log(`[CRAIGSLIST] dropping stale post ${postId} (postedAt: ${postedAt})`)
+      return null
+    }
+  }
+
+  // bedrooms/bathrooms come as "2br/1ba" or "1BR / 1Ba" — parseInt handles the leading digit
+  const bedroomStr = String(item.bedrooms || '')
+  const bedrooms = bedroomStr ? parseInt(bedroomStr) : null
+  const bathMatch = bedroomStr.match(/(\d+)\s*[Bb]a/)
+  const bathrooms = bathMatch ? parseInt(bathMatch[1]) : null
+
+  const sqftStr = String(item.sqft || '')
+  const sqft = sqftStr ? (parseInt(sqftStr.replace(/[^0-9]/g, '')) || null) : null
+
+  // Prefer priceNumeric (integer) over parsing the price string
+  const rent = Math.round(
+    (Number(item.priceNumeric) || parseFloat(String(item.price || '0').replace(/[^0-9.]/g, '')) || 0) * 100
+  )
+
+  const address = String(item.address || item.location || '')
+
+  return {
+    externalId: String(postId),
+    source: 'craigslist',
+    url: String(item.url || ''),
+    title: String(item.title || ''),
+    address,
+    city: String(item.city || ''),
+    state: String(item.state || ''),
+    neighborhood: item.location ? String(item.location).split(',')[0].trim() : null,
+    zipCode: item.zipCode ? String(item.zipCode) : null,
+    rent,
+    bedrooms,
+    bathrooms,
+    sqft: sanitizeSqft(sqft),
+    availableDate: postedAt ? postedAt.split('T')[0] : null,
+    amenities: [],
+    description: item.description ? String(item.description) : null,
+    // Actor returns imageUrls (array), not images
+    images: Array.isArray(item.imageUrls) ? item.imageUrls.map(String)
+           : Array.isArray(item.images) ? item.images.map(String) : [],
+  }
+}
+
+function validateTruliaItem(item: Record<string, unknown>): ScrapedListing | null {
+  // igolaizola/trulia-scraper returns nested objects — access via typed casts
+  type Loc = { city?: string; stateCode?: string; zipCode?: string; streetAddress?: string; formattedLocation?: string; neighborhood?: string | null }
+  type Beds = { formattedValue?: string }
+  type Floor = { formattedDimension?: string }
+  type Meta = { typedHomeId?: string }
+  type Media = { photos?: Array<{ url?: { large?: string } }> }
+  type ActiveListing = { dateListed?: string }
+  type CurrentStatus = { isActiveForRent?: boolean; isOffMarket?: boolean }
+  type TrackingEntry = { key: string; value: string }
+  type Tag = { formattedName: string }
+  type GenericPrice = { formattedPrice?: string }
+
+  const loc = item.location as Loc | undefined
+  const status = item.currentStatus as CurrentStatus | undefined
+  if (status?.isActiveForRent === false) return null
+  if (status?.isOffMarket === true) return null
+
+  const tracking = Array.isArray(item.tracking) ? (item.tracking as TrackingEntry[]) : []
+  const trackingMap = Object.fromEntries(tracking.map(e => [e.key, e.value]))
+
+  const externalId = trackingMap.zPID
+    || String((item.metadata as Meta | undefined)?.typedHomeId || '').replace('_ZPID', '')
+    || String(item.zpid || item.id || '')
+  if (!externalId) return null
+
+  // genericPrice.formattedPrice (e.g. "$2,100/mo") is the documented field; tracking.listingPrice is a fallback
+  const genericPriceNum = parseFloat(
+    ((item.genericPrice as GenericPrice | undefined)?.formattedPrice || '').replace(/[^0-9.]/g, '')
+  ) || 0
+  const trackingPriceNum = parseFloat(trackingMap.listingPrice || '0') || 0
+  const rent = Math.round((genericPriceNum || trackingPriceNum || parseFloat(String(item.price || item.rent || '0')) || 0) * 100)
+
+  const bedsStr = (item.bedrooms as Beds | undefined)?.formattedValue || ''
+  const bathsStr = (item.bathrooms as Beds | undefined)?.formattedValue || ''
+  const sqftStr = (item.floorSpace as Floor | undefined)?.formattedDimension || ''
+
+  const bedrooms = parseInt(bedsStr) || null
+  const bathrooms = parseFloat(bathsStr) || null
+  const sqftRaw = parseInt(sqftStr.replace(/[^0-9]/g, '')) || null
+
+  const amenities: string[] = []
+  const itemStr = trackingMap.item || ''
+  const tagNames = Array.isArray(item.largeTags) ? (item.largeTags as Tag[]).map(t => t.formattedName) : []
+
+  if (tagNames.some(t => /pet.friendly|pets.allowed/i.test(t)) || /Pets Allowed[^;]*Yes/i.test(itemStr))
+    amenities.push('pet_friendly')
+  const laundryMatch = itemStr.match(/rental:Laundry:([^;]+)/)
+  if (laundryMatch && !/contact manager/i.test(laundryMatch[1]))
+    amenities.push(`laundry: ${laundryMatch[1].trim()}`)
+  const parkingMatch = itemStr.match(/rental:Parking:([^;]+)/)
+  if (parkingMatch && !/contact manager/i.test(parkingMatch[1]))
+    amenities.push(`parking: ${parkingMatch[1].trim()}`)
+  if (/Utilities Included[^;]*Yes/i.test(itemStr))
+    amenities.push('utilities_included')
+  // Additional signals from largeTags
+  if (tagNames.some(t => /gym|fitness/i.test(t)))       amenities.push('gym')
+  if (tagNames.some(t => /doorman|concierge/i.test(t))) amenities.push('doorman')
+  if (tagNames.some(t => /pool/i.test(t)))              amenities.push('pool')
+  if (tagNames.some(t => /elevator/i.test(t)))          amenities.push('elevator')
+  if (tagNames.some(t => /rooftop/i.test(t)))           amenities.push('rooftop')
+
+  // Log amenitiesList if present — structure not documented; helps us map it in a follow-on
+  if (item.amenitiesList) console.log('[TRULIA] amenitiesList:', JSON.stringify(item.amenitiesList, null, 2))
+
+  const photos = (item.media as Media | undefined)?.photos || []
+  const images = photos.map(p => p.url?.large).filter((u): u is string => !!u)
+
+  // Confirmed field name from actor docs: location.neighborhood (not .neighborhoodName)
+  const neighborhood = loc?.neighborhood || null
+
+  return {
+    externalId,
+    source: 'trulia',
+    url: String(item.url || ''),
+    title: String(loc?.formattedLocation || ''),
+    address: String(loc?.streetAddress || ''),
+    city: String(loc?.city || ''),
+    state: String(loc?.stateCode || ''),
+    neighborhood,
+    zipCode: loc?.zipCode ? String(loc.zipCode) : null,
+    rent,
+    bedrooms,
+    bathrooms,
+    sqft: sanitizeSqft(sqftRaw),
+    availableDate: (item.activeListing as ActiveListing | undefined)?.dateListed
+      ? String((item.activeListing as ActiveListing).dateListed).split('T')[0]
+      : null,
+    amenities,
+    description: null,
+    images,
+  }
+}
+
 function mapListings(items: Record<string, unknown>[], source: string): ScrapedListing[] {
   if (source === 'zillow') {
-    // igolaizola/zillow-scraper-ppe with flattenOutput:true returns dot-notation keys.
-    // Log the first raw item so we can verify field names after the first real run.
-    if (items.length > 0) console.log('ZILLOW PPE RAW ITEM:', JSON.stringify(items[0], null, 2))
-
+    if (items.length > 0) logRawSample('zillow', items[0])
     return items.flatMap(item => {
-      // zpid is the stable Zillow property ID — prefer it; fall back to id
-      const zpid = item.zpid || item['hdpData.homeInfo.zpid'] || item.id
-      if (!zpid) return []
-
-      // flattenOutput:true serialises nested objects with dot-notation keys.
-      // Confirmed field names from actor schema:
-      //   price.value, address.{streetAddress,city,state,zipcode} (dot-notation when flattened),
-      //   bedrooms, bathrooms, livingArea (top-level),
-      //   url / hdpUrl for the listing page,
-      //   media.allPropertyPhotos.highResolution (array of photo URLs),
-      //   _details.description (populated when fetchDetails:true)
-      const streetAddress = item['address.streetAddress'] || item.streetAddress || item.address || ''
-      const city          = item['address.city']          || item.city          || ''
-      const state         = item['address.state']         || item.state         || ''
-      const zipCode       = item['address.zipcode']       || item.zipcode       || item.zipCode || null
-      const price         = Number(item['price.value']    || 0)
-      const beds          = item.bedrooms   ?? null
-      const baths         = item.bathrooms  ?? null
-      const sqftRaw       = item.livingArea ?? null
-      const detailUrl     = String(item.url || item.hdpUrl || '')
-      const desc          = item['_details.description'] ? String(item['_details.description']) : null
-      const rawPhotos     = item['media.allPropertyPhotos.highResolution']
-      const imgs: string[] = Array.isArray(rawPhotos) ? rawPhotos.map(String) : []
-
-      const bedsLabel  = beds  != null ? `${beds}bd`  : ''
-      const bathsLabel = baths != null ? `${baths}ba` : ''
-      const title = String([bedsLabel, bathsLabel].filter(Boolean).join(' ') || streetAddress)
-
-      return [{
-        externalId: String(zpid),
-        source: 'zillow',
-        url: detailUrl,
-        title,
-        address: String(streetAddress),
-        city: String(city),
-        state: String(state),
-        neighborhood: item.neighborhood ? String(item.neighborhood) : null,
-        zipCode: zipCode ? String(zipCode) : null,
-        rent: Math.round(price * 100),
-        bedrooms:  beds  != null ? Number(beds)  : null,
-        bathrooms: baths != null ? Number(baths) : null,
-        sqft: sanitizeSqft(sqftRaw as number | null),
-        availableDate: null,
-        amenities: [],
-        description: desc,
-        images: imgs,
-      }]
+      const listing = validateZillowItem(item)
+      return listing && isScoreable(listing) ? [listing] : []
     })
   }
 
   if (source === 'apartments_com') {
+    if (items.length > 0) logRawSample('apartments_com', items[0])
     return items.flatMap(item => {
-      const propertyId = item.id || item.propertyId
-      if (!propertyId) return []
-      return [{
-        externalId: String(propertyId),
-        source: 'apartments_com',
-        url: String(item.url || item.detailUrl || ''),
-        title: String(item.name || item.title || ''),
-        address: String(item.address || ''),
-        city: String(item.city || ''),
-        state: String(item.state || ''),
-        neighborhood: null,
-        zipCode: item.zipCode ? String(item.zipCode) : null,
-        rent: Math.round((Number(item.minRent || item.rent) || 0) * 100),
-        bedrooms: item.beds ? Number(item.beds) : null,
-        bathrooms: item.baths ? Number(item.baths) : null,
-        sqft: sanitizeSqft(item.sqft as number | null),
-        availableDate: item.availableDate ? String(item.availableDate) : null,
-        amenities: Array.isArray(item.amenities) ? item.amenities.map(String) : [],
-        description: item.description ? String(item.description) : null,
-        images: Array.isArray(item.photos) ? item.photos.map(String) : [],
-      }]
+      const listing = validateApartmentsComItem(item)
+      return listing && isScoreable(listing) ? [listing] : []
     })
   }
 
   if (source === 'craigslist') {
-    return items.map(item => {
-      // bedrooms/bathrooms come as "1BR / 1Ba" — parseInt handles the leading digit correctly
-      const bedroomStr = String(item.bedrooms || '')
-      const bedrooms = bedroomStr ? parseInt(bedroomStr) : null  // "1BR / 1Ba" → 1, "0BR" → 0
-      const bathMatch = bedroomStr.match(/(\d+)\s*[Bb]a/)
-      const bathrooms = bathMatch ? parseInt(bathMatch[1]) : null  // "1BR / 1Ba" → 1
-
-      // sqft comes as "550ft2" — strip non-numeric chars
-      const sqftStr = String(item.sqft || '')
-      const sqft = sqftStr ? (parseInt(sqftStr.replace(/[^0-9]/g, '')) || null) : null
-
-      // price comes as "$1,120" — strip non-numeric chars before parsing
-      const rent = Math.round((parseFloat(String(item.price || '0').replace(/[^0-9.]/g, '')) || 0) * 100)
-
-      // city/state not returned by actor — use what's in the title/location context
-      // address: prefer structured address, fall back to location string
-      const address = String(item.address || item.location || '')
-
-      const postId = item.id || item.postId
-      if (!postId) return null
-      return {
-        externalId: String(postId),
-        source: 'craigslist',
-        url: String(item.url || ''),
-        title: String(item.title || ''),
-        address,
-        city: String(item.city || ''),
-        state: String(item.state || ''),
-        neighborhood: item.location ? String(item.location).split(',')[0].trim() : null,
-        zipCode: item.zipCode ? String(item.zipCode) : null,
-        rent,
-        bedrooms,
-        bathrooms,
-        sqft: sanitizeSqft(sqft),
-        availableDate: item.postedAt ? String(item.postedAt).split('T')[0] : null,
-        amenities: [] as string[],
-        description: item.description ? String(item.description) : null,
-        images: Array.isArray(item.images) ? item.images.map(String) : [],
-      }
-    }).filter((l): l is ScrapedListing => l !== null)
+    if (items.length > 0) logRawSample('craigslist', items[0])
+    return items.flatMap(item => {
+      const listing = validateCraigslistItem(item)
+      return listing && isScoreable(listing) ? [listing] : []
+    })
   }
 
   if (source === 'trulia') {
-    return items.flatMap((item, idx) => {
-      // Scraper returns nested objects — access via typed casts, not flat-dotted keys
-      type Loc = { city?: string; stateCode?: string; zipCode?: string; streetAddress?: string; formattedLocation?: string; neighborhoodName?: string | null }
-      type Beds = { formattedValue?: string }
-      type Floor = { formattedDimension?: string }
-      type Meta = { typedHomeId?: string }
-      type Media = { photos?: Array<{ url?: { large?: string } }> }
-      type ActiveListing = { dateListed?: string }
-      type CurrentStatus = { isActiveForRent?: boolean }
-      type TrackingEntry = { key: string; value: string }
-      type Tag = { formattedName: string }
-
-      const loc = item.location as Loc | undefined
-      const status = item.currentStatus as CurrentStatus | undefined
-      if (status?.isActiveForRent === false) return []
-
-      const tracking = Array.isArray(item.tracking) ? (item.tracking as TrackingEntry[]) : []
-      const trackingMap = Object.fromEntries(tracking.map(e => [e.key, e.value]))
-
-      const externalId = trackingMap.zPID
-        || String((item.metadata as Meta | undefined)?.typedHomeId || '').replace('_ZPID', '')
-        || String(item.zpid || item.id || '')
-      if (!externalId) return []
-
-      const rawPrice = trackingMap.listingPrice || String(item.price || item.rent || '0')
-      const rent = Math.round((parseFloat(rawPrice) || 0) * 100)
-
-      const bedsStr = (item.bedrooms as Beds | undefined)?.formattedValue || ''
-      const bathsStr = (item.bathrooms as Beds | undefined)?.formattedValue || ''
-      const sqftStr = (item.floorSpace as Floor | undefined)?.formattedDimension || ''
-
-      const bedrooms = parseInt(bedsStr) || null
-      const bathrooms = parseFloat(bathsStr) || null
-      const sqftRaw = parseInt(sqftStr.replace(/[^0-9]/g, '')) || null
-
-      // Parse tracking "item" key: "...;eightBitItem|rental:Feature:Value;..."
-      const amenities: string[] = []
-      const itemStr = trackingMap.item || ''
-      const tagNames = Array.isArray(item.largeTags) ? (item.largeTags as Tag[]).map(t => t.formattedName) : []
-      if (tagNames.some(t => t.includes('PET FRIENDLY')) || /Pets Allowed[^;]*Yes/i.test(itemStr))
-        amenities.push('pet_friendly')
-      const laundryMatch = itemStr.match(/rental:Laundry:([^;]+)/)
-      if (laundryMatch && !/contact manager/i.test(laundryMatch[1]))
-        amenities.push(`laundry: ${laundryMatch[1].trim()}`)
-      const parkingMatch = itemStr.match(/rental:Parking:([^;]+)/)
-      if (parkingMatch && !/contact manager/i.test(parkingMatch[1]))
-        amenities.push(`parking: ${parkingMatch[1].trim()}`)
-      if (/Utilities Included[^;]*Yes/i.test(itemStr))
-        amenities.push('utilities_included')
-
-      const photos = (item.media as Media | undefined)?.photos || []
-      const images = photos.map(p => p.url?.large).filter((u): u is string => !!u)
-
-      // Use neighborhoodName from scraper if available; geocoding fills it in later if null
-      const neighborhood = loc?.neighborhoodName || null
-
-      return [{
-        externalId,
-        source: 'trulia',
-        url: String(item.url || ''),
-        title: String(loc?.formattedLocation || ''),
-        address: String(loc?.streetAddress || ''),
-        city: String(loc?.city || ''),
-        state: String(loc?.stateCode || ''),
-        neighborhood,
-        zipCode: loc?.zipCode ? String(loc.zipCode) : null,
-        rent,
-        bedrooms,
-        bathrooms,
-        sqft: sanitizeSqft(sqftRaw),
-        availableDate: (item.activeListing as ActiveListing | undefined)?.dateListed
-          ? String((item.activeListing as ActiveListing).dateListed).split('T')[0]
-          : null,
-        amenities,
-        description: null,
-        images,
-      }]
+    if (items.length > 0) logRawSample('trulia', items[0])
+    return items.flatMap(item => {
+      const listing = validateTruliaItem(item)
+      return listing && isScoreable(listing) ? [listing] : []
     })
   }
 
