@@ -468,12 +468,19 @@ function validateTruliaItem(item: Record<string, unknown>): ScrapedListing | nul
     || String(item.zpid || item.id || '')
   if (!externalId) return null
 
-  // genericPrice.formattedPrice (e.g. "$2,100/mo") is the documented field; tracking.listingPrice is a fallback
-  const genericPriceNum = parseFloat(
-    ((item.genericPrice as GenericPrice | undefined)?.formattedPrice || '').replace(/[^0-9.]/g, '')
-  ) || 0
+  // genericPrice.formattedPrice (e.g. "$2,100/mo") is the documented field; tracking.listingPrice is a fallback.
+  // Use match(/\$([\d,]+)/) to grab only the FIRST dollar amount — ranges like "$3,500 - $4,200/mo"
+  // previously caused the regex to concatenate both numbers into "$35004200", yielding $350M rents.
+  const priceStr = (item.genericPrice as GenericPrice | undefined)?.formattedPrice || ''
+  const firstPriceMatch = priceStr.match(/\$([\d,]+)/)
+  const genericPriceNum = firstPriceMatch ? parseFloat(firstPriceMatch[1].replace(/,/g, '')) : 0
   const trackingPriceNum = parseFloat(trackingMap.listingPrice || '0') || 0
   const rent = Math.round((genericPriceNum || trackingPriceNum || parseFloat(String(item.price || item.rent || '0')) || 0) * 100)
+  // Drop listings where parsed rent exceeds $50k/mo — these are sale prices leaking through
+  if (rent > 5_000_000) {
+    console.log(`[TRULIA] dropping high-rent listing ${externalId} (rent=${rent/100}, priceStr="${priceStr}")`)
+    return null
+  }
 
   const bedsStr = (item.bedrooms as Beds | undefined)?.formattedValue || ''
   const bathsStr = (item.bathrooms as Beds | undefined)?.formattedValue || ''
