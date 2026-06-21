@@ -147,7 +147,10 @@ export async function POST(req: NextRequest) {
 
           try {
             const imageBlocks = await fetchListingImages(listing.images || [], 5)
-            const textContent = `User preferences:\n${JSON.stringify(preferences, null, 2)}\n\nListing:\n${JSON.stringify({
+            const priorityNote = preferences.priorities
+              ? `\nDimension priorities — weight your scores accordingly (high = more influential, low = less influential):\n${JSON.stringify(preferences.priorities, null, 2)}\n`
+              : ''
+            const textContent = `User preferences:\n${JSON.stringify(preferences, null, 2)}${priorityNote}\n\nListing:\n${JSON.stringify({
               address: listing.address,
               zip_code: listing.zipCode,
               neighborhood: listing.neighborhood,

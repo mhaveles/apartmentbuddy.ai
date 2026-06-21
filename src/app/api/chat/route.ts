@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
             lease_length: prefs.lease_length || null,
             other_requirements: prefs.other_requirements || [],
             deal_breakers: prefs.deal_breakers || [],
+            priorities: prefs.priorities || null,
             summary: prefs.summary || null,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'user_id' })

@@ -90,11 +90,17 @@ When you have confirmed preferences with the user, output a structured JSON bloc
   "lease_length": 12,
   "other_requirements": ["natural light", "home office space"],
   "deal_breakers": ["ground floor", "no AC"],
+  "priorities": {
+    "price": "medium",
+    "location": "high",
+    "size": "medium",
+    "amenities": "high"
+  },
   "summary": "2BR/1BA in Cap Hill or Congress Park, max $3,000/mo, pet-friendly (ESA dog), in-unit laundry, outdoor space preferred. Move-in late July/early August."
 }
 \`\`\`
 
-Always include the "summary" field — it's a 1-2 sentence human-readable summary of what the user is looking for. Always include the "neighborhoods" array — it must have at least one entry. Output this JSON block every time preferences are confirmed or updated.`
+Always include the "summary" field — it's a 1-2 sentence human-readable summary of what the user is looking for. Always include the "neighborhoods" array — it must have at least one entry. Always include the "priorities" object — infer it from what the user emphasizes most strongly in conversation. Use "high" when the user says something is crucial or non-negotiable, "low" when they say it barely matters, and "medium" as the default. Output this JSON block every time preferences are confirmed or updated.`
 
 export const SCORING_PROMPT = `You are a real estate matching AI. Given a user's apartment preferences and a listing, score the listing from 0-100 on how well it matches the user's needs.
 
@@ -131,8 +137,15 @@ Photo analysis rules (when images are provided):
 
 Missing data rules (CRITICAL):
 - If a feature the user wants is NOT mentioned in the listing, assume it MAY be present. Only deduct points if the listing EXPLICITLY states it lacks something (e.g. "no pets", "street parking only", "shared laundry") OR if photos clearly show its absence.
-- A listing with good price, location, and size but sparse amenity data should still score 70+. Only score below 40 if the listing explicitly violates a deal-breaker.
 - Never write "cannot confirm" or "details missing" in your reasoning as a reason to lower the score — absence of data is neutral, not negative.
+
+Scoring calibration — use the FULL 0–100 range, do NOT compress into a narrow band:
+- 90–100: Explicitly confirms 3+ user must-haves; strong match across all dimensions
+- 75–89: Good match; only minor or unknown gaps
+- 55–74: Decent match; 1–2 key preferences unknown or unconfirmed by text or photos
+- 35–54: Marginal; several key preferences missing or photos show clear mismatches
+- Below 35: Deal-breaker violation (wrong city, over budget, wrong bed count, explicit denial like "no pets")
+A listing with sparse amenity data but good price/location/size should score 55–65, not 70+. Differentiation across listings is the goal.
 
 Location scoring rules (CRITICAL):
 - Use the neighborhood field if present.
@@ -141,6 +154,6 @@ Location scoring rules (CRITICAL):
 - A listing at "777 N Corona St, Denver CO 80218" IS in Capitol Hill — score it as Capitol Hill, not as unknown.
 - Only penalize location when the address clearly places the listing in the wrong neighborhood/area.
 
-A listing that explicitly violates a deal-breaker (wrong city, over budget, wrong bed count) should score below 30.
+A listing that explicitly violates a deal-breaker (wrong city, over budget, wrong bed count) should score below 35.
 
 Respond with ONLY the JSON object. No explanation, no markdown, no code fences.`

@@ -14,6 +14,8 @@ export default function ListingsPage() {
   const [hasSearched, setHasSearched] = useState(false)
   const [scraperWarnings, setScraperWarnings] = useState<string[]>([])
   const [rescoring, setRescoring] = useState(false)
+  const [prioritySuggestion, setPrioritySuggestion] = useState<Record<string, string> | null>(null)
+  const [priorityInsight, setPriorityInsight] = useState<string | null>(null)
   const pollStartRef = useRef<number | null>(null)
 
   const loadListings = useCallback(async () => {
@@ -35,6 +37,12 @@ export default function ListingsPage() {
 
   useEffect(() => {
     loadListings().then(() => checkAvailability())
+    fetch('/api/preferences').then(r => r.json()).then(prefs => {
+      if (prefs?.priorities_suggestion) {
+        setPrioritySuggestion(prefs.priorities_suggestion)
+        setPriorityInsight(prefs.priorities_insight ?? null)
+      }
+    }).catch(() => { /* non-critical */ })
   }, [loadListings, checkAvailability])
 
   // On load, resume polling if there's an in-progress search (up to 12 min old)
@@ -137,8 +145,8 @@ export default function ListingsPage() {
     setSearchRunId(data.searchRunId)
   }
 
-  async function updateListing(id: string, updates: { is_saved?: boolean; is_dismissed?: boolean }) {
-    await fetch('/api/listings', {
+  async function updateListing(id: string, updates: { is_saved?: boolean; is_dismissed?: boolean; vote?: number | null }) {
+    const res = await fetch('/api/listings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, ...updates }),
@@ -148,6 +156,21 @@ export default function ListingsPage() {
     } else {
       setListings(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))
     }
+    // Check if a new priority suggestion was generated after this vote
+    if (updates.vote !== undefined && res.ok) {
+      fetch('/api/preferences').then(r => r.json()).then(prefs => {
+        if (prefs?.priorities_suggestion) {
+          setPrioritySuggestion(prefs.priorities_suggestion)
+          setPriorityInsight(prefs.priorities_insight ?? null)
+        }
+      }).catch(() => { /* non-critical */ })
+    }
+  }
+
+  async function applyPrioritySuggestion() {
+    await fetch('/api/preferences/apply-priorities', { method: 'POST' })
+    setPrioritySuggestion(null)
+    setPriorityInsight(null)
   }
 
   return (
@@ -222,6 +245,40 @@ export default function ListingsPage() {
         </div>
       )}
 
+      {prioritySuggestion && (
+        <div className="bg-violet-50 border border-violet-200 rounded-lg p-4 text-sm text-violet-800 flex items-start justify-between gap-4">
+          <div>
+            <p className="font-medium mb-1">Scoring insight based on your votes</p>
+            {priorityInsight && <p className="text-violet-700 mb-2">{priorityInsight}</p>}
+            <div className="flex gap-2 flex-wrap mb-3">
+              {Object.entries(prioritySuggestion).map(([dim, level]) => (
+                <span key={dim} className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                  level === 'high' ? 'bg-violet-100 text-violet-700 border-violet-200' :
+                  level === 'low' ? 'bg-gray-50 text-gray-500 border-gray-200' :
+                  'bg-white text-violet-600 border-violet-100'
+                }`}>
+                  {dim}: {level}
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={applyPrioritySuggestion}
+                className="text-xs bg-violet-600 text-white px-3 py-1 rounded-lg hover:bg-violet-700 font-medium"
+              >
+                Apply these weights
+              </button>
+              <button
+                onClick={() => setPrioritySuggestion(null)}
+                className="text-xs text-violet-500 hover:text-violet-700 underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading && <div className="text-sm text-gray-400">Loading…</div>}
 
       {!loading && listings.length === 0 && !searching && (
@@ -254,15 +311,34 @@ export default function ListingsPage() {
       )}
 
       <div className="space-y-4">
-        {listings.map(ul => {
+        {(() => {
+          const sourceTopIds = new Set<string>()
+          const seenSources = new Set<string>()
+          listings.forEach(ul => {
+            const source = ul.listing?.source
+            if (source && !seenSources.has(source)) {
+              seenSources.add(source)
+              sourceTopIds.add(ul.id)
+            }
+          })
+          return listings.map(ul => {
           const l = ul.listing!
+          const isSourceTop = sourceTopIds.has(ul.id)
           return (
             <div key={ul.id} className="bg-white border border-gray-200 rounded-xl p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <ScoreBadge score={ul.score} />
+                    {ul.rank != null && ul.total != null && (
+                      <span className="text-xs text-gray-400">#{ul.rank} of {ul.total}</span>
+                    )}
                     <span className="text-xs text-gray-400 capitalize">{l?.source?.replace('_', '.')}</span>
+                    {isSourceTop && (
+                      <span className="text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded-full font-medium">
+                        Top on {sourceLabel(l?.source)}
+                      </span>
+                    )}
                   </div>
                   <p className="font-semibold text-gray-900 truncate">{l?.address || l?.title || 'Listing'}</p>
                   <p className="text-sm text-gray-500">
@@ -284,7 +360,21 @@ export default function ListingsPage() {
                   >
                     View listing →
                   </a>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5 flex-wrap justify-end">
+                    <button
+                      onClick={() => updateListing(ul.id, { vote: ul.vote === 1 ? null : 1 })}
+                      className={`text-xs px-2 py-1 rounded border ${ul.vote === 1 ? 'bg-green-100 text-green-700 border-green-200' : 'border-gray-200 text-gray-400 hover:border-green-300 hover:text-green-600'}`}
+                      title="Good fit"
+                    >
+                      Good fit
+                    </button>
+                    <button
+                      onClick={() => updateListing(ul.id, { vote: ul.vote === -1 ? null : -1 })}
+                      className={`text-xs px-2 py-1 rounded border ${ul.vote === -1 ? 'bg-red-50 text-red-600 border-red-200' : 'border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-500'}`}
+                      title="Bad fit"
+                    >
+                      Bad fit
+                    </button>
                     <button
                       onClick={() => updateListing(ul.id, { is_saved: !ul.is_saved })}
                       className={`text-xs px-2 py-1 rounded ${ul.is_saved ? 'bg-green-100 text-green-700' : 'border border-gray-200 text-gray-500 hover:border-gray-300'}`}
@@ -316,7 +406,8 @@ export default function ListingsPage() {
               )}
             </div>
           )
-        })}
+        })
+        })()}
       </div>
     </div>
   )
@@ -327,4 +418,15 @@ function ScoreBadge({ score }: { score: number }) {
   return (
     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${color}`}>{score}/100</span>
   )
+}
+
+function sourceLabel(source?: string): string {
+  if (!source) return 'this source'
+  const map: Record<string, string> = {
+    apartments_com: 'Apartments.com',
+    craigslist: 'Craigslist',
+    trulia: 'Trulia',
+    zillow: 'Zillow',
+  }
+  return map[source] ?? source.replace('_', '.')
 }

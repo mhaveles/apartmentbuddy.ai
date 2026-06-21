@@ -32,6 +32,7 @@ export interface Preferences {
   lease_length: string | null
   other_requirements: string[] | null
   deal_breakers: string[] | null
+  priorities: Record<string, string> | null
   summary: string | null
 }
 
@@ -89,6 +90,9 @@ export interface UserListing {
   score_reasoning: string | null
   is_saved: boolean
   is_dismissed: boolean
+  vote?: number | null
+  rank?: number
+  total?: number
   listing?: Listing
 }
 

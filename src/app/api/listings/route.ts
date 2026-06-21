@@ -50,7 +50,13 @@ export async function GET(req: NextRequest) {
     return true
   })
 
-  return NextResponse.json(deduplicated)
+  const ranked = deduplicated.map((ul, i) => ({
+    ...ul,
+    rank: i + 1,
+    total: deduplicated.length,
+  }))
+
+  return NextResponse.json(ranked)
 }
 
 export async function PATCH(req: NextRequest) {
@@ -58,11 +64,12 @@ export async function PATCH(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id, is_saved, is_dismissed } = await req.json()
+  const { id, is_saved, is_dismissed, vote } = await req.json()
 
-  const updates: Record<string, boolean> = {}
+  const updates: Record<string, boolean | number | null> = {}
   if (is_saved !== undefined) updates.is_saved = is_saved
   if (is_dismissed !== undefined) updates.is_dismissed = is_dismissed
+  if (vote !== undefined) updates.vote = vote
 
   const { data } = await supabase
     .from('user_listings')
@@ -71,6 +78,28 @@ export async function PATCH(req: NextRequest) {
     .eq('user_id', user.id)
     .select()
     .single()
+
+  // After a vote, check if we've hit the recalibration threshold (10, 15, 20, ...)
+  if (vote !== undefined && vote !== null) {
+    const { count } = await supabase
+      .from('user_listings')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .not('vote', 'is', null)
+
+    const totalVotes = count ?? 0
+    if (totalVotes >= 10 && (totalVotes === 10 || totalVotes % 5 === 0)) {
+      // Fire recalibration in background — don't await so PATCH responds immediately
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/preferences/recalibrate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+        },
+        body: JSON.stringify({ userId: user.id }),
+      }).catch(() => { /* non-critical */ })
+    }
+  }
 
   return NextResponse.json(data)
 }
