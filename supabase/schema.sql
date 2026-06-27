@@ -95,6 +95,8 @@ create table public.user_listings (
   score integer not null, -- 0-100
   score_breakdown jsonb, -- {price: 90, location: 80, amenities: 70, ...}
   score_reasoning text, -- AI explanation
+  vote integer, -- 1 (good fit) or -1 (bad fit), null = unvoted
+  score_vote_delta integer, -- score * vote: negative = AI/user disagreement
   is_saved boolean not null default false,
   is_dismissed boolean not null default false,
   notified_at timestamptz,
@@ -183,6 +185,23 @@ returns public.search_runs as $$
   returning *;
 $$ language sql security definer;
 
+-- Migration: add vote column to user_listings
+-- alter table public.user_listings
+--   add column if not exists vote smallint check (vote in (-1, 1));
+
+-- Migration: add sources tracking to user_listings + atomic append function
+-- Run in Supabase SQL Editor:
+-- alter table public.user_listings
+--   add column if not exists sources text[];
+--
+-- create or replace function public.append_user_listing_source(ul_id uuid, new_source text)
+-- returns void as $$
+--   update public.user_listings
+--   set sources = array_append(coalesce(sources, array[]::text[]), new_source)
+--   where id = ul_id
+--     and not (coalesce(sources, array[]::text[]) @> array[new_source]::text[]);
+-- $$ language sql security definer;
+
 -- Function to refund a search credit on failed runs
 create or replace function public.decrement_searches_used(user_id uuid)
 returns void as $$
@@ -192,3 +211,39 @@ begin
   where id = user_id;
 end;
 $$ language plpgsql security definer;
+
+-- =========================================================
+-- Intent-based chat sessions (replaces monolithic conversations)
+-- =========================================================
+
+create table public.chat_sessions (
+  id          uuid        primary key default gen_random_uuid(),
+  user_id     uuid        not null references auth.users,
+  intent      text        not null check (intent in ('onboarding', 'refinement', 'check-in', 'deep-dive')),
+  status      text        not null default 'open' check (status in ('open', 'resolved')),
+  context     jsonb,
+  created_at  timestamptz not null default now(),
+  resolved_at timestamptz
+);
+
+alter table public.chat_sessions enable row level security;
+
+create policy "users manage own sessions"
+  on public.chat_sessions for all
+  using  (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create table public.chat_messages (
+  id          uuid        primary key default gen_random_uuid(),
+  session_id  uuid        not null references public.chat_sessions,
+  role        text        not null check (role in ('user', 'assistant')),
+  content     text        not null,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.chat_messages enable row level security;
+
+create policy "users manage own messages"
+  on public.chat_messages for all
+  using  (session_id in (select id from public.chat_sessions where user_id = auth.uid()))
+  with check (session_id in (select id from public.chat_sessions where user_id = auth.uid()));

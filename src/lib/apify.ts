@@ -298,7 +298,16 @@ function validateZillowItem(item: Record<string, unknown>): ScrapedListing | nul
   const city          = item['address.city']          || item.city          || ''
   const state         = item['address.state']         || item.state         || ''
   const zipCode       = item['address.zipcode']       || item.zipcode       || item.zipCode || null
-  const priceRaw      = Number(item['price.value']    || 0)
+
+  // The actor populates rent across several fields depending on listing type; check in priority order.
+  let priceRaw = 0
+  let priceField = 'none'
+  for (const field of ['rental.baseRent', '_details.price', 'price.value', 'hdpView.price'] as const) {
+    const val = Number(item[field] || 0)
+    if (val > 0) { priceRaw = val; priceField = field; break }
+  }
+  console.log(`[ZILLOW] zpid=${zpid} rent=${priceRaw} (field: ${priceField})`)
+
   // Drop for-sale listings: monthly rents in Denver are under $10k; values above that are sale prices.
   // The actor may return mixed listing types regardless of homeStatus filter.
   if (priceRaw > 10000) {

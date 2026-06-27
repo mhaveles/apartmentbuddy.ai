@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { UserListing } from '@/types'
+import { scoreTier } from '@/lib/scoring-utils'
 
 export default function ListingsPage() {
   const [listings, setListings] = useState<UserListing[]>([])
@@ -16,7 +17,14 @@ export default function ListingsPage() {
   const [rescoring, setRescoring] = useState(false)
   const [prioritySuggestion, setPrioritySuggestion] = useState<Record<string, string> | null>(null)
   const [priorityInsight, setPriorityInsight] = useState<string | null>(null)
+  const [checkInSessionId, setCheckInSessionId] = useState<string | null>(null)
+  const [checkInConversationId, setCheckInConversationId] = useState<string | null>(null)
+  const [checkInMessages, setCheckInMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
+  const [checkInInput, setCheckInInput] = useState('')
+  const [checkInSending, setCheckInSending] = useState(false)
+  const [deepDiveListing, setDeepDiveListing] = useState<UserListing | null>(null)
   const pollStartRef = useRef<number | null>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
 
   const loadListings = useCallback(async () => {
     const res = await fetch(`/api/listings${savedOnly ? '?saved=true' : ''}`)
@@ -167,10 +175,79 @@ export default function ListingsPage() {
     }
   }
 
-  async function applyPrioritySuggestion() {
-    await fetch('/api/preferences/apply-priorities', { method: 'POST' })
+  // Create a check-in session and seed the opening message when a suggestion first appears
+  useEffect(() => {
+    if (!prioritySuggestion || checkInSessionId) return
+    fetch('/api/chat/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intent: 'check-in', context: { insight: priorityInsight, suggestion: prioritySuggestion } }),
+    }).then(r => r.json()).then(s => setCheckInSessionId(s.id)).catch(() => {})
+    setCheckInMessages(priorityInsight ? [{ role: 'assistant' as const, content: priorityInsight }] : [])
+  }, [prioritySuggestion, checkInSessionId, priorityInsight])
+
+  useEffect(() => {
+    if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+  }, [checkInMessages])
+
+  async function sendCheckIn() {
+    const text = checkInInput.trim()
+    if (!text || checkInSending) return
+    setCheckInInput('')
+    setCheckInMessages(prev => [...prev, { role: 'user', content: text }])
+    setCheckInSending(true)
+    try {
+      const messageToSend = !checkInConversationId && priorityInsight
+        ? `Scoring insight from my votes: ${priorityInsight}\n\nMy response: ${text}`
+        : text
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageToSend, conversationId: checkInConversationId, intent: 'check-in' }),
+      })
+      const data = await res.json()
+      if (data.message?.content) setCheckInMessages(prev => [...prev, { role: 'assistant', content: data.message.content }])
+      if (data.conversationId && !checkInConversationId) setCheckInConversationId(data.conversationId)
+    } catch (err) {
+      console.error('Check-in send error:', err)
+    } finally {
+      setCheckInSending(false)
+    }
+  }
+
+  async function applyCheckIn() {
+    await fetch('/api/preferences/apply-priorities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    if (checkInSessionId) {
+      fetch(`/api/chat/sessions/${checkInSessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'resolved' }),
+      }).catch(() => {})
+    }
     setPrioritySuggestion(null)
     setPriorityInsight(null)
+    setCheckInSessionId(null)
+    setCheckInConversationId(null)
+    setCheckInMessages([])
+  }
+
+  async function dismissCheckIn() {
+    if (checkInSessionId) {
+      fetch(`/api/chat/sessions/${checkInSessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'resolved' }),
+      }).catch(() => {})
+    }
+    setPrioritySuggestion(null)
+    setPriorityInsight(null)
+    setCheckInSessionId(null)
+    setCheckInConversationId(null)
+    setCheckInMessages([])
   }
 
   return (
@@ -246,35 +323,62 @@ export default function ListingsPage() {
       )}
 
       {prioritySuggestion && (
-        <div className="bg-violet-50 border border-violet-200 rounded-lg p-4 text-sm text-violet-800 flex items-start justify-between gap-4">
-          <div>
-            <p className="font-medium mb-1">Scoring insight based on your votes</p>
-            {priorityInsight && <p className="text-violet-700 mb-2">{priorityInsight}</p>}
-            <div className="flex gap-2 flex-wrap mb-3">
-              {Object.entries(prioritySuggestion).map(([dim, level]) => (
-                <span key={dim} className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-                  level === 'high' ? 'bg-violet-100 text-violet-700 border-violet-200' :
-                  level === 'low' ? 'bg-gray-50 text-gray-500 border-gray-200' :
-                  'bg-white text-violet-600 border-violet-100'
-                }`}>
-                  {dim}: {level}
-                </span>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={applyPrioritySuggestion}
-                className="text-xs bg-violet-600 text-white px-3 py-1 rounded-lg hover:bg-violet-700 font-medium"
-              >
-                Apply these weights
-              </button>
-              <button
-                onClick={() => setPrioritySuggestion(null)}
-                className="text-xs text-violet-500 hover:text-violet-700 underline"
-              >
-                Dismiss
-              </button>
-            </div>
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-sm space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-violet-200 text-violet-700 flex items-center justify-center text-xs font-bold">AI</span>
+            <p className="font-medium text-violet-800">Scoring insight based on your votes</p>
+          </div>
+          <div className="flex gap-2 flex-wrap pl-8">
+            {Object.entries(prioritySuggestion).map(([dim, level]) => (
+              <span key={dim} className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                level === 'high' ? 'bg-violet-100 text-violet-700 border-violet-200' :
+                level === 'low'  ? 'bg-gray-50 text-gray-500 border-gray-200' :
+                                   'bg-white text-violet-600 border-violet-100'
+              }`}>
+                {dim}: {level}
+              </span>
+            ))}
+          </div>
+          <div ref={chatScrollRef} className="pl-8 space-y-2 max-h-60 overflow-y-auto">
+            {checkInMessages.map((msg, i) => (
+              msg.role === 'assistant' ? (
+                <p key={i} className="text-violet-700 leading-relaxed">{msg.content}</p>
+              ) : (
+                <p key={i} className="text-gray-700 bg-white rounded-lg px-3 py-2 border border-violet-100">{msg.content}</p>
+              )
+            ))}
+            {checkInSending && <p className="text-violet-400 text-xs animate-pulse">Thinking…</p>}
+          </div>
+          <div className="flex gap-2 items-center pl-8">
+            <input
+              value={checkInInput}
+              onChange={e => setCheckInInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !checkInSending) { e.preventDefault(); sendCheckIn() } }}
+              placeholder="Reply to the AI…"
+              className="flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
+              disabled={checkInSending}
+            />
+            <button
+              onClick={sendCheckIn}
+              disabled={checkInSending || !checkInInput.trim()}
+              className="shrink-0 text-xs bg-violet-600 text-white px-3 py-2 rounded-lg hover:bg-violet-700 disabled:opacity-50 font-medium"
+            >
+              Send
+            </button>
+          </div>
+          <div className="flex gap-2 pl-8">
+            <button
+              onClick={applyCheckIn}
+              className="text-xs bg-violet-600 text-white px-3 py-1 rounded-lg hover:bg-violet-700 font-medium"
+            >
+              Apply these weights
+            </button>
+            <button
+              onClick={dismissCheckIn}
+              className="text-xs text-violet-500 hover:text-violet-700 underline"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}
@@ -308,6 +412,10 @@ export default function ListingsPage() {
             </>
           )}
         </div>
+      )}
+
+      {deepDiveListing && (
+        <DeepDiveModal listing={deepDiveListing} onClose={() => setDeepDiveListing(null)} />
       )}
 
       <div className="space-y-4">
@@ -404,6 +512,14 @@ export default function ListingsPage() {
                   ))}
                 </div>
               )}
+              {ul.score != null && (
+                <button
+                  onClick={() => setDeepDiveListing(ul)}
+                  className="mt-2 text-xs text-indigo-400 hover:text-indigo-600"
+                >
+                  Why this score?
+                </button>
+              )}
             </div>
           )
         })
@@ -414,9 +530,13 @@ export default function ListingsPage() {
 }
 
 function ScoreBadge({ score }: { score: number }) {
-  const color = score >= 80 ? 'bg-green-100 text-green-700' : score >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'
+  const scoreColor = score >= 80 ? 'bg-green-100 text-green-700' : score >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-600'
+  const tierColor = score >= 80 ? 'bg-green-50 text-green-600 border-green-100' : score >= 60 ? 'bg-yellow-50 text-yellow-600 border-yellow-100' : score >= 40 ? 'bg-gray-50 text-gray-500 border-gray-100' : 'bg-red-50 text-red-500 border-red-100'
   return (
-    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${color}`}>{score}/100</span>
+    <span className="inline-flex items-center gap-1.5 flex-shrink-0">
+      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreColor}`}>{score}/100</span>
+      <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${tierColor}`}>{scoreTier(score)}</span>
+    </span>
   )
 }
 
@@ -429,4 +549,158 @@ function sourceLabel(source?: string): string {
     zillow: 'Zillow',
   }
   return map[source] ?? source.replace('_', '.')
+}
+
+type ChatMessage = { role: 'user' | 'assistant'; content: string }
+
+function DeepDiveModal({ listing, onClose }: { listing: UserListing; onClose: () => void }) {
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  }, [messages, sending])
+
+  useEffect(() => {
+    async function init() {
+      setSending(true)
+      try {
+        const sessionRes = await fetch('/api/chat/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            intent: 'deep-dive',
+            context: {
+              listing_id: listing.id,
+              score: listing.score,
+              score_breakdown: listing.score_breakdown,
+              score_reasoning: listing.score_reasoning,
+            },
+          }),
+        })
+        const session = await sessionRes.json()
+        if (session.id) setSessionId(session.id)
+
+        const openingMessage = [
+          `Explain why this listing scored ${listing.score}/100.`,
+          `Score breakdown: ${JSON.stringify(listing.score_breakdown ?? {})}`,
+          `Reasoning: ${listing.score_reasoning ?? 'No reasoning provided.'}`,
+        ].join('\n\n')
+
+        const chatRes = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: openingMessage, intent: 'deep-dive' }),
+        })
+        const data = await chatRes.json()
+        if (data.message?.content) setMessages([{ role: 'assistant', content: data.message.content }])
+        if (data.conversationId) setConversationId(data.conversationId)
+      } catch (err) {
+        console.error('Deep-dive init error:', err)
+      } finally {
+        setSending(false)
+      }
+    }
+    init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function handleClose() {
+    if (sessionId) {
+      fetch(`/api/chat/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'resolved' }),
+      }).catch(() => {})
+    }
+    onClose()
+  }
+
+  async function send() {
+    const text = input.trim()
+    if (!text || sending) return
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: text }])
+    setSending(true)
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, conversationId, intent: 'deep-dive' }),
+      })
+      const data = await res.json()
+      if (data.message?.content) setMessages(prev => [...prev, { role: 'assistant', content: data.message.content }])
+      if (data.conversationId && !conversationId) setConversationId(data.conversationId)
+    } catch (err) {
+      console.error('Deep-dive send error:', err)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const l = listing.listing!
+  const title = l?.address || l?.title || 'Listing'
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="flex-1 bg-black/40" onClick={handleClose} />
+      <div className="w-full max-w-lg bg-white shadow-xl flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="min-w-0">
+            <p className="font-semibold text-gray-900 truncate text-sm">{title}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <ScoreBadge score={listing.score} />
+            </div>
+          </div>
+          <button
+            onClick={handleClose}
+            className="ml-4 shrink-0 text-gray-400 hover:text-gray-600 text-xl leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+          {messages.length === 0 && sending && (
+            <p className="text-sm text-gray-400 animate-pulse">Analyzing…</p>
+          )}
+          {messages.map((msg, i) =>
+            msg.role === 'assistant' ? (
+              <div key={i} className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{msg.content}</div>
+            ) : (
+              <div key={i} className="flex justify-end">
+                <div className="bg-indigo-600 text-white text-sm px-3 py-2 rounded-xl max-w-xs leading-relaxed">{msg.content}</div>
+              </div>
+            )
+          )}
+          {messages.length > 0 && sending && (
+            <p className="text-xs text-gray-400 animate-pulse">Thinking…</p>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !sending) { e.preventDefault(); send() } }}
+            placeholder="Ask a follow-up question…"
+            disabled={sending}
+            className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
+          />
+          <button
+            onClick={send}
+            disabled={sending || !input.trim()}
+            className="shrink-0 bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchScrapedListingsByRunId } from '@/lib/apify'
 import { getAnthropic, SCORING_PROMPT, fetchListingImages } from '@/lib/anthropic'
+import { buildVotedContext, type VotedRow } from '@/lib/scoring-utils'
 
 export const maxDuration = 60
 
@@ -70,10 +71,24 @@ export async function POST(req: NextRequest) {
   let scoredThisRun = 0
 
   if (resolvedRunId) {
-    // Fetch preferences and listings in parallel
-    const [prefResult, listings] = await Promise.all([
+    // Fetch preferences, listings, and voted examples in parallel
+    const [prefResult, listings, likedResult, dislikedResult] = await Promise.all([
       supabase.from('preferences').select('*').eq('user_id', userId).single(),
       fetchScrapedListingsByRunId(resolvedRunId, source),
+      supabase
+        .from('user_listings')
+        .select('vote, score_breakdown, listing:listings(address, neighborhood, city, rent, bedrooms, bathrooms, sqft, amenities)')
+        .eq('user_id', userId)
+        .eq('vote', 1)
+        .order('scored_at', { ascending: false })
+        .limit(5),
+      supabase
+        .from('user_listings')
+        .select('vote, score_breakdown, listing:listings(address, neighborhood, city, rent, bedrooms, bathrooms, sqft, amenities)')
+        .eq('user_id', userId)
+        .eq('vote', -1)
+        .order('scored_at', { ascending: false })
+        .limit(5),
     ])
     const preferences = prefResult.data
 
@@ -125,16 +140,99 @@ export async function POST(req: NextRequest) {
     // Scoring inline is safe: with CONCURRENCY=10, 100 listings takes ~15s, under Apify's 30s timeout.
     if (preferences && savedListings.length > 0) {
       const SCORE_CONCURRENCY = 10
+      const votedContext = buildVotedContext([
+        ...((likedResult.data ?? []) as VotedRow[]),
+        ...((dislikedResult.data ?? []) as VotedRow[]),
+      ])
       const filteredForScoring = savedListings.filter(({ listing }) => {
         if (preferences.max_rent && listing.rent > preferences.max_rent) return false
         if (preferences.min_bedrooms != null && listing.bedrooms !== null && listing.bedrooms < preferences.min_bedrooms) return false
         if (preferences.max_bedrooms != null && listing.bedrooms !== null && listing.bedrooms > preferences.max_bedrooms) return false
         return true
       })
-      console.log(`Scoring ${filteredForScoring.length}/${savedListings.length} listings (after pref filter)`)
 
-      for (let i = 0; i < filteredForScoring.length; i += SCORE_CONCURRENCY) {
-        const batch = filteredForScoring.slice(i, i + SCORE_CONCURRENCY)
+      // Phase 1.5: Dedup before scoring — prevents paying for Anthropic calls on duplicates.
+      // Fetch all listings this user already has scored to catch cross-source matches
+      // (same apartment on Apartments.com and Craigslist gets different listing_id UUIDs,
+      //  so the idempotency check below can't catch them — we need this URL/address+rent check).
+      const { data: existingUserListings } = await supabase
+        .from('user_listings')
+        .select('id, listing:listings(url, address, rent)')
+        .eq('user_id', userId)
+
+      const seenUrls = new Set<string>()
+      const seenAddrRent = new Set<string>()
+      const dupKeyToULId = new Map<string, string>()
+      for (const ul of existingUserListings || []) {
+        const l = ul.listing as { url?: string; address?: string; rent?: number } | null
+        if (l?.url) {
+          const urlKey = l.url.trim()
+          seenUrls.add(urlKey)
+          dupKeyToULId.set(`url:${urlKey}`, ul.id as string)
+        }
+        if (l?.address && l.address.trim().length > 5 && l?.rent) {
+          const addrRentKey = `${l.address.toLowerCase().trim()}:${l.rent}`
+          seenAddrRent.add(addrRentKey)
+          dupKeyToULId.set(`addr:${addrRentKey}`, ul.id as string)
+        }
+      }
+
+      const batchSeenUrls = new Set<string>()
+      const batchSeenAddrRent = new Set<string>()
+      const toScore: typeof filteredForScoring = []
+      const sourceUpdates: Array<{ ulId: string; newSource: string }> = []
+
+      for (const item of filteredForScoring) {
+        const urlKey = item.listing.url?.trim()
+        const addrRentKey =
+          item.listing.address && item.listing.address.trim().length > 5 && item.listing.rent
+            ? `${item.listing.address.toLowerCase().trim()}:${item.listing.rent}`
+            : null
+
+        // Cross-source DB match — already scored under a different source's listing_id
+        let crossDupULId: string | undefined
+        if (urlKey && seenUrls.has(urlKey)) crossDupULId = dupKeyToULId.get(`url:${urlKey}`)
+        else if (addrRentKey && seenAddrRent.has(addrRentKey)) crossDupULId = dupKeyToULId.get(`addr:${addrRentKey}`)
+
+        if (crossDupULId) {
+          sourceUpdates.push({ ulId: crossDupULId, newSource: item.listing.source })
+          continue
+        }
+
+        // Within-batch duplicate (same source returning the same listing twice)
+        if ((urlKey && batchSeenUrls.has(urlKey)) || (addrRentKey && batchSeenAddrRent.has(addrRentKey))) continue
+
+        if (urlKey) batchSeenUrls.add(urlKey)
+        if (addrRentKey) batchSeenAddrRent.add(addrRentKey)
+        toScore.push(item)
+      }
+
+      // Cap at 50: cheapest first as a preference proxy to stay within Vercel's 60s timeout
+      const preCapCount = toScore.length
+      if (toScore.length > 50) {
+        toScore.sort((a, b) => a.listing.rent - b.listing.rent)
+        toScore.splice(50)
+      }
+      const capDropped = preCapCount - toScore.length
+      const dupSkipped = filteredForScoring.length - preCapCount
+
+      console.log(
+        `Dedup: ${dupSkipped} skipped (${sourceUpdates.length} cross-source), ` +
+        `${capDropped} capped, scoring ${toScore.length}/${filteredForScoring.length} listings`
+      )
+
+      // Atomic sources append for cross-source dupes — single SQL UPDATE, no fetch-then-write race.
+      // Idempotent: the SQL guard prevents adding the same source twice on webhook retries.
+      if (sourceUpdates.length > 0) {
+        await Promise.allSettled(
+          sourceUpdates.map(({ ulId, newSource }) =>
+            supabase.rpc('append_user_listing_source', { ul_id: ulId, new_source: newSource })
+          )
+        )
+      }
+
+      for (let i = 0; i < toScore.length; i += SCORE_CONCURRENCY) {
+        const batch = toScore.slice(i, i + SCORE_CONCURRENCY)
         const results = await Promise.all(batch.map(async ({ id: listingId, listing }) => {
           // Skip if already scored for this user (idempotent on webhook retries)
           const { data: existing } = await supabase
@@ -150,7 +248,7 @@ export async function POST(req: NextRequest) {
             const priorityNote = preferences.priorities
               ? `\nDimension priorities — weight your scores accordingly (high = more influential, low = less influential):\n${JSON.stringify(preferences.priorities, null, 2)}\n`
               : ''
-            const textContent = `User preferences:\n${JSON.stringify(preferences, null, 2)}${priorityNote}\n\nListing:\n${JSON.stringify({
+            const textContent = `User preferences:\n${JSON.stringify(preferences, null, 2)}${priorityNote}${votedContext}\n\nListing:\n${JSON.stringify({
               address: listing.address,
               zip_code: listing.zipCode,
               neighborhood: listing.neighborhood,
@@ -187,6 +285,7 @@ export async function POST(req: NextRequest) {
                 score: scoreData.score,
                 score_breakdown: scoreData.breakdown,
                 score_reasoning: scoreData.reasoning,
+                sources: [listing.source],
               })
               return 1
             }
@@ -197,7 +296,7 @@ export async function POST(req: NextRequest) {
         }))
         scoredThisRun += results.reduce((a: number, b: number) => a + b, 0)
       }
-      console.log(`Scored ${scoredThisRun}/${filteredForScoring.length} listings for ${source}`)
+      console.log(`Scored ${scoredThisRun}/${toScore.length} listings for ${source}`)
     } else {
       console.log(`Skipping scoring: preferences=${!!preferences} savedListings=${savedListings.length}`)
     }

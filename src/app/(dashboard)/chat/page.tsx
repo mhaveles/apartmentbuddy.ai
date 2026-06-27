@@ -15,6 +15,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [preferencesExtracted, setPreferencesExtracted] = useState(false)
+  const [onboardingSessionId, setOnboardingSessionId] = useState<string | null>(null)
   const [restoring, setRestoring] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -32,6 +33,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     async function restore() {
+      let hasPreferences = false
+
       try {
         const res = await fetch('/api/conversations/latest')
         if (res.ok) {
@@ -40,9 +43,41 @@ export default function ChatPage() {
             setMessages(data.messages)
             setConversationId(data.id)
             setPreferencesExtracted(data.preferences_extracted)
+            hasPreferences = !!data.preferences_extracted
           }
         }
       } catch {}
+
+      if (!hasPreferences) {
+        try {
+          const prefsRes = await fetch('/api/preferences')
+          if (prefsRes.ok) {
+            const prefs = await prefsRes.json()
+            if (Object.keys(prefs).length > 0) hasPreferences = true
+          }
+        } catch {}
+      }
+
+      if (!hasPreferences) {
+        const existing = sessionStorage.getItem('onboardingSessionId')
+        if (existing) {
+          setOnboardingSessionId(existing)
+        } else {
+          try {
+            const sessionRes = await fetch('/api/chat/sessions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ intent: 'onboarding' }),
+            })
+            if (sessionRes.ok) {
+              const session = await sessionRes.json()
+              setOnboardingSessionId(session.id)
+              sessionStorage.setItem('onboardingSessionId', session.id)
+            }
+          } catch {}
+        }
+      }
+
       setRestoring(false)
     }
     restore()
@@ -52,6 +87,8 @@ export default function ChatPage() {
     setMessages([INITIAL_MESSAGE])
     setConversationId(null)
     setPreferencesExtracted(false)
+    setOnboardingSessionId(null)
+    sessionStorage.removeItem('onboardingSessionId')
     setInput('')
   }
 
@@ -68,7 +105,11 @@ export default function ChatPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, conversationId }),
+        body: JSON.stringify({
+          message: text,
+          conversationId,
+          ...(onboardingSessionId ? { intent: 'onboarding' } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -80,7 +121,18 @@ export default function ChatPage() {
       } else {
         setMessages(prev => [...prev, data.message])
         setConversationId(data.conversationId)
-        if (data.preferencesExtracted) setPreferencesExtracted(true)
+        if (data.preferencesExtracted) {
+          setPreferencesExtracted(true)
+          if (onboardingSessionId) {
+            fetch(`/api/chat/sessions/${onboardingSessionId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'resolved' }),
+            }).catch(() => {})
+            setOnboardingSessionId(null)
+            sessionStorage.removeItem('onboardingSessionId')
+          }
+        }
       }
     } catch (err) {
       setMessages(prev => [...prev, {
@@ -91,7 +143,7 @@ export default function ChatPage() {
     } finally {
       setLoading(false)
     }
-  }, [loading, conversationId])
+  }, [loading, conversationId, onboardingSessionId])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {

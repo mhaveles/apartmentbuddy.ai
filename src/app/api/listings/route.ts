@@ -69,7 +69,16 @@ export async function PATCH(req: NextRequest) {
   const updates: Record<string, boolean | number | null> = {}
   if (is_saved !== undefined) updates.is_saved = is_saved
   if (is_dismissed !== undefined) updates.is_dismissed = is_dismissed
-  if (vote !== undefined) updates.vote = vote
+  if (vote !== undefined) {
+    const { data: cur } = await supabase
+      .from('user_listings')
+      .select('score')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single()
+    updates.vote = vote
+    updates.score_vote_delta = vote !== null && cur?.score != null ? cur.score * vote : null
+  }
 
   const { data } = await supabase
     .from('user_listings')

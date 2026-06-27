@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getAnthropic, SYSTEM_PROMPT } from '@/lib/anthropic'
+import { getAnthropic, getSystemPrompt, ChatIntent } from '@/lib/anthropic'
 import { Message } from '@/types'
 
 export async function POST(req: NextRequest) {
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized — not logged in' }, { status: 401 })
     }
 
-    const { message, conversationId } = await req.json()
+    const { message, conversationId, intent }: { message: string; conversationId?: string; intent?: ChatIntent } = await req.json()
 
     // Get or create conversation
     let conversation
@@ -49,9 +49,9 @@ export async function POST(req: NextRequest) {
 
     // Call Claude
     const response = await getAnthropic().messages.create({
-      model: 'claude-opus-4-6',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
+      system: getSystemPrompt(intent),
       messages: messages.map(m => ({ role: m.role, content: m.content })),
     })
 
@@ -64,9 +64,10 @@ export async function POST(req: NextRequest) {
     }
     messages.push(newAssistantMessage)
 
-    // Check if preferences JSON is in the response
+    // Check if preferences JSON is in the response (only relevant for onboarding/refinement)
     let preferencesExtracted = conversation.preferences_extracted
-    const jsonMatch = assistantContent.match(/```json\n([\s\S]*?)\n```/)
+    const shouldExtractPrefs = !intent || intent === 'onboarding' || intent === 'refinement'
+    const jsonMatch = shouldExtractPrefs ? assistantContent.match(/```json\n([\s\S]*?)\n```/) : null
     if (jsonMatch) {
       try {
         const prefs = JSON.parse(jsonMatch[1])
