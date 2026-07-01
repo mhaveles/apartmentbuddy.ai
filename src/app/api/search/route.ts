@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { startZillowScrape, startCraigslistScrape, startTruliaScrape } from '@/lib/apify'
-import { FREE_SEARCH_LIMIT } from '@/lib/stripe'
+import { checkCredits, recordSearchUsed } from '@/lib/credits'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -11,20 +11,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Check plan limits
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('plan, searches_used')
-    .eq('id', user.id)
-    .single()
+  const creditCheck = await checkCredits(supabase, user.id)
 
-  if (!profile) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-  }
-
-  if (profile.plan === 'free' && profile.searches_used >= FREE_SEARCH_LIMIT) {
+  if (!creditCheck.allowed) {
     return NextResponse.json(
-      { error: 'Free search limit reached. Upgrade to Pro for continuous monitoring.', upgrade: true },
+      { error: "You've used your 3 free searches. Get 3 more for $5.", paywall: true },
       { status: 403 }
     )
   }
@@ -74,14 +65,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create search run' }, { status: 500 })
   }
 
-  // Update searches used for free tier
-  if (profile.plan === 'free') {
-    await supabase
-      .from('profiles')
-      .update({ searches_used: profile.searches_used + 1 })
-      .eq('id', user.id)
-  }
-
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/apify/webhook?secret=${process.env.CRON_SECRET}`
 
   const [zillowResult, craigslistResult, truliaResult] = await Promise.allSettled([
@@ -124,6 +107,10 @@ export async function POST(req: NextRequest) {
       apify_runs_pending: successfulStarts,
     })
     .eq('id', searchRun.id)
+
+  if (creditCheck.plan === 'free') {
+    await recordSearchUsed(supabase, user.id)
+  }
 
   return NextResponse.json({ searchRunId: searchRun.id, status: 'running', started: successfulStarts, failures })
 }

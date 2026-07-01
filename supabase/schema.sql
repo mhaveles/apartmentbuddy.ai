@@ -11,6 +11,7 @@ create table public.profiles (
   stripe_subscription_id text,
   subscription_status text, -- 'active' | 'canceled' | 'past_due'
   searches_used int not null default 0,
+  credits int not null default 3,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -211,6 +212,27 @@ begin
   where id = user_id;
 end;
 $$ language plpgsql security definer;
+
+-- Migration: credit packs (Stripe one-time $5 purchases add 3 credits)
+-- Run in Supabase SQL Editor:
+-- alter table public.profiles
+--   add column if not exists credits int not null default 3;
+--
+-- create or replace function public.increment_credits(user_id uuid, amount int)
+-- returns public.profiles as $$
+--   update public.profiles
+--   set credits = credits + amount, updated_at = now()
+--   where id = user_id
+--   returning *;
+-- $$ language sql security definer;
+--
+-- create or replace function public.increment_searches_used(user_id uuid)
+-- returns public.profiles as $$
+--   update public.profiles
+--   set searches_used = searches_used + 1, updated_at = now()
+--   where id = user_id
+--   returning *;
+-- $$ language sql security definer;
 
 -- =========================================================
 -- Intent-based chat sessions (replaces monolithic conversations)
