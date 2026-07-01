@@ -9,6 +9,7 @@ export interface Profile {
   stripe_subscription_id: string | null
   subscription_status: string | null
   searches_used: number
+  credits: number
   created_at: string
   updated_at: string
 }

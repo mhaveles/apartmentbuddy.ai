@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { stripe, CREDIT_PACK_SIZE } from '@/lib/stripe'
 import { createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 
@@ -21,7 +21,17 @@ export async function POST(req: NextRequest) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
       const userId = session.metadata?.supabase_user_id
-      if (userId) {
+      if (!userId) break
+
+      if (session.mode === 'payment') {
+        // One-time credit pack purchase — credits amount was stamped onto the
+        // session's own metadata at checkout-creation time (see create-checkout route),
+        // so no follow-up Stripe API call is needed here.
+        const fromMetadata = Number(session.metadata?.credits)
+        const amount = Number.isFinite(fromMetadata) && fromMetadata > 0 ? fromMetadata : CREDIT_PACK_SIZE
+        const { error } = await supabase.rpc('increment_credits', { user_id: userId, amount })
+        if (error) console.error('increment_credits RPC failed:', error.message)
+      } else {
         await supabase
           .from('profiles')
           .update({

@@ -15,6 +15,8 @@ export default function ListingsPage() {
   const [hasSearched, setHasSearched] = useState(false)
   const [scraperWarnings, setScraperWarnings] = useState<string[]>([])
   const [rescoring, setRescoring] = useState(false)
+  const [showPaywall, setShowPaywall] = useState(false)
+  const [purchasing, setPurchasing] = useState(false)
   const [prioritySuggestion, setPrioritySuggestion] = useState<Record<string, string> | null>(null)
   const [priorityInsight, setPriorityInsight] = useState<string | null>(null)
   const [checkInSessionId, setCheckInSessionId] = useState<string | null>(null)
@@ -134,8 +136,9 @@ export default function ListingsPage() {
     const res = await fetch('/api/search', { method: 'POST' })
     const data = await res.json()
     if (data.error) {
-      if (data.upgrade) {
-        window.location.href = '/upgrade'
+      if (data.paywall) {
+        setShowPaywall(true)
+        setSearching(false)
         return
       }
       const detail = Array.isArray(data.details) && data.details.length
@@ -151,6 +154,14 @@ export default function ListingsPage() {
     }
     pollStartRef.current = Date.now()
     setSearchRunId(data.searchRunId)
+  }
+
+  async function buyCredits() {
+    setPurchasing(true)
+    const res = await fetch('/api/stripe/create-checkout', { method: 'POST' })
+    const data = await res.json()
+    if (data.url) window.location.href = data.url
+    else setPurchasing(false)
   }
 
   async function updateListing(id: string, updates: { is_saved?: boolean; is_dismissed?: boolean; vote?: number | null }) {
@@ -319,6 +330,19 @@ export default function ListingsPage() {
       {searchTimedOut && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
           The search is taking longer than expected — the scrapers may have failed to return results. Try running a new search.
+        </div>
+      )}
+
+      {showPaywall && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-sm text-indigo-900 flex items-center justify-between gap-4">
+          <p>You&apos;ve used your 3 free searches. Get 3 more for $5.</p>
+          <button
+            onClick={buyCredits}
+            disabled={purchasing}
+            className="shrink-0 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {purchasing ? 'Redirecting…' : 'Get 3 more for $5'}
+          </button>
         </div>
       )}
 

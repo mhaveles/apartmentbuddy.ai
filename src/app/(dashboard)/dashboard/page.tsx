@@ -62,7 +62,7 @@ export default async function DashboardPage() {
         <StatCard
           label="Plan"
           value={profile?.plan === 'pro' ? 'Pro' : 'Free'}
-          sub={profile?.plan === 'free' ? `${profile.searches_used}/1 searches used` : 'Continuous monitoring'}
+          sub={profile?.plan === 'free' ? `${profile.searches_used}/${profile.credits} searches used` : 'Continuous monitoring'}
         />
       </div>
 
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
 
       {/* Run search CTA */}
       {hasPreferences && hasNeighborhoods && (
-        <RunSearchButton plan={profile?.plan || 'free'} searchesUsed={profile?.searches_used || 0} />
+        <RunSearchButton plan={profile?.plan || 'free'} searchesUsed={profile?.searches_used || 0} credits={profile?.credits ?? 3} />
       )}
     </div>
   )
@@ -173,16 +173,16 @@ function ScoreBadge({ score }: { score: number }) {
   )
 }
 
-function RunSearchButton({ plan, searchesUsed }: { plan: string; searchesUsed: number }) {
-  const canSearch = plan === 'pro' || searchesUsed < 1
+function RunSearchButton({ plan, searchesUsed, credits }: { plan: string; searchesUsed: number; credits: number }) {
+  const canSearch = plan === 'pro' || searchesUsed < credits
   if (!canSearch) return (
     <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-center justify-between">
       <div>
-        <p className="font-semibold text-amber-900">Free search used</p>
-        <p className="text-sm text-amber-700">Upgrade to Pro for continuous monitoring</p>
+        <p className="font-semibold text-amber-900">You&apos;ve used your 3 free searches</p>
+        <p className="text-sm text-amber-700">Get 3 more for $5, or upgrade to Pro for continuous monitoring</p>
       </div>
-      <Link href="/upgrade" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">
-        Upgrade
+      <Link href="/listings" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shrink-0">
+        Get more searches
       </Link>
     </div>
   )
