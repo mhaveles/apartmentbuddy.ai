@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { getAnonSessionId, clearAnonSessionId } from '@/lib/anon-session-cookie'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -28,7 +29,7 @@ export default function SignupPage() {
       setLoading(false)
     } else if (data.session) {
       // Email confirmation disabled — logged in immediately
-      const anonSessionId = sessionStorage.getItem('anonSessionId')
+      const anonSessionId = getAnonSessionId()
       if (anonSessionId) {
         try {
           const res = await fetch('/api/auth/migrate-session', {
@@ -38,7 +39,7 @@ export default function SignupPage() {
           })
           const migration = await res.json()
           if (res.ok && migration.searchRunId) {
-            sessionStorage.removeItem('anonSessionId')
+            clearAnonSessionId()
             router.push('/search/loading?runId=' + migration.searchRunId)
             return
           }

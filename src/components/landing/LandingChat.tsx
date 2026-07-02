@@ -2,20 +2,9 @@
 
 import { useState } from 'react'
 import SignupModal from './SignupModal'
+import { getAnonSessionId, setAnonSessionId } from '@/lib/anon-session-cookie'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
-
-const SESSION_COOKIE = 'ab_anon_session'
-
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
-  return match ? decodeURIComponent(match[1]) : null
-}
-
-function setCookie(name: string, value: string) {
-  const oneYear = 60 * 60 * 24 * 365
-  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${oneYear}; samesite=lax`
-}
 
 export default function LandingChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -34,8 +23,8 @@ export default function LandingChat() {
 
     let currentSessionId = sessionId
     if (!currentSessionId) {
-      currentSessionId = getCookie(SESSION_COOKIE) || crypto.randomUUID()
-      setCookie(SESSION_COOKIE, currentSessionId)
+      currentSessionId = getAnonSessionId() || crypto.randomUUID()
+      setAnonSessionId(currentSessionId)
       setSessionId(currentSessionId)
     }
 
