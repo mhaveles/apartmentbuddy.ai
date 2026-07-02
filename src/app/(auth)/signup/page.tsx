@@ -28,6 +28,24 @@ export default function SignupPage() {
       setLoading(false)
     } else if (data.session) {
       // Email confirmation disabled — logged in immediately
+      const anonSessionId = sessionStorage.getItem('anonSessionId')
+      if (anonSessionId) {
+        try {
+          const res = await fetch('/api/auth/migrate-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: anonSessionId }),
+          })
+          const migration = await res.json()
+          if (res.ok && migration.searchRunId) {
+            sessionStorage.removeItem('anonSessionId')
+            router.push('/search/loading?runId=' + migration.searchRunId)
+            return
+          }
+        } catch {
+          // fall through to default redirect
+        }
+      }
       router.push('/chat')
     } else {
       // Email confirmation required
