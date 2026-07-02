@@ -269,3 +269,35 @@ create policy "users manage own messages"
   on public.chat_messages for all
   using  (session_id in (select id from public.chat_sessions where user_id = auth.uid()))
   with check (session_id in (select id from public.chat_sessions where user_id = auth.uid()));
+
+-- =========================================================
+-- Anonymous pre-login intake sessions
+-- =========================================================
+
+create table public.anon_sessions (
+  id                 uuid primary key default gen_random_uuid(),
+  session_id         text not null unique,
+  preferences_json   jsonb,
+  chat_history       jsonb not null default '[]'::jsonb,
+  created_at         timestamptz not null default now(),
+  converted_user_id  uuid references auth.users(id),
+  status             text not null default 'pending' check (status in ('pending', 'converted', 'expired'))
+);
+
+alter table public.anon_sessions enable row level security;
+-- No policies: this table is only ever touched by server routes using the
+-- service-role client (createServiceClient). RLS is enabled purely so a leaked
+-- anon key can never read or write it.
+
+-- Marks an anon session converted and hands back its data for the caller to
+-- migrate into `preferences`/`monitored_neighborhoods`. Guards against double-firing
+-- on retries: only succeeds once, while status is still 'pending'.
+create or replace function public.migrate_anon_session(anon_session_id uuid, new_user_id uuid)
+returns public.anon_sessions as $$
+  update public.anon_sessions
+  set converted_user_id = new_user_id,
+      status = 'converted'
+  where id = anon_session_id
+    and status = 'pending'
+  returning *;
+$$ language sql security definer;
