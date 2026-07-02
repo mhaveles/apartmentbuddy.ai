@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { applyExtractedPreferences } from '@/lib/preferences'
-import { triggerSearchForUser } from '@/lib/search-trigger'
+import { migrateAnonSession } from '@/lib/migrate-anon-session'
 
 // Called by the signup flow right after auth completes. Marks the anon session
 // converted, migrates its preferences_json into the new user's preferences +
@@ -20,35 +19,15 @@ export async function POST(req: NextRequest) {
   }
 
   const service = await createServiceClient()
+  const result = await migrateAnonSession(supabase, service, user.id, sessionId)
 
-  const { data: anonSession } = await service
-    .from('anon_sessions')
-    .select('id')
-    .eq('session_id', sessionId)
-    .single()
-
-  if (!anonSession) {
-    return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status })
   }
 
-  const { data: migrated, error: rpcError } = await service
-    .rpc('migrate_anon_session', { anon_session_id: anonSession.id, new_user_id: user.id })
-    .select()
-    .single()
-
-  if (rpcError || !migrated) {
-    return NextResponse.json({ error: 'Session already converted or not found' }, { status: 409 })
+  if ('searchError' in result) {
+    return NextResponse.json({ migrated: true, searchError: result.searchError })
   }
 
-  const prefs = (migrated as { preferences_json: Record<string, unknown> | null }).preferences_json
-  if (prefs) {
-    await applyExtractedPreferences(supabase, user.id, prefs)
-  }
-
-  const searchResult = await triggerSearchForUser(supabase, user.id)
-  if (!searchResult.ok) {
-    return NextResponse.json({ migrated: true, searchError: searchResult.error })
-  }
-
-  return NextResponse.json({ migrated: true, searchRunId: searchResult.searchRunId })
+  return NextResponse.json({ migrated: true, searchRunId: result.searchRunId })
 }
