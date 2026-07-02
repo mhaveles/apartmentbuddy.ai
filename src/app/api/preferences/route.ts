@@ -6,11 +6,19 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data } = await supabase
+  const { data: prefs } = await supabase
     .from('preferences')
-    .select('priorities, priorities_suggestion, priorities_insight')
+    .select('*')
     .eq('user_id', user.id)
     .single()
 
-  return NextResponse.json(data ?? {})
+  if (!prefs) return NextResponse.json({})
+
+  const { data: neighborhoods } = await supabase
+    .from('monitored_neighborhoods')
+    .select('neighborhood, city, state')
+    .eq('user_id', user.id)
+    .eq('active', true)
+
+  return NextResponse.json({ ...prefs, neighborhoods: neighborhoods ?? [] })
 }
