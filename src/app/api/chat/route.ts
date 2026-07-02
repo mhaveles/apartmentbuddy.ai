@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getAnthropic, getSystemPrompt, ChatIntent } from '@/lib/anthropic'
+import { extractPreferencesJson, applyExtractedPreferences } from '@/lib/preferences'
 import { Message } from '@/types'
 
 export async function POST(req: NextRequest) {
@@ -67,61 +68,10 @@ export async function POST(req: NextRequest) {
     // Check if preferences JSON is in the response (only relevant for onboarding/refinement)
     let preferencesExtracted = conversation.preferences_extracted
     const shouldExtractPrefs = !intent || intent === 'onboarding' || intent === 'refinement'
-    const jsonMatch = shouldExtractPrefs ? assistantContent.match(/```json\n([\s\S]*?)\n```/) : null
-    if (jsonMatch) {
-      try {
-        const prefs = JSON.parse(jsonMatch[1])
-        const { error: upsertError } = await supabase
-          .from('preferences')
-          .upsert({
-            user_id: user.id,
-            max_rent: prefs.max_rent ? prefs.max_rent * 100 : null,
-            min_bedrooms: prefs.min_bedrooms || null,
-            max_bedrooms: prefs.max_bedrooms || null,
-            min_bathrooms: prefs.min_bathrooms || null,
-            pet_friendly: prefs.pet_friendly ?? null,
-            parking_required: prefs.parking_required ?? null,
-            in_unit_laundry: prefs.in_unit_laundry ?? null,
-            air_conditioning: prefs.air_conditioning ?? null,
-            gym: prefs.gym ?? null,
-            rooftop: prefs.rooftop ?? null,
-            doorman: prefs.doorman ?? null,
-            elevator: prefs.elevator ?? null,
-            outdoor_space: prefs.outdoor_space ?? null,
-            move_in_date: prefs.move_in_date || null,
-            lease_length: prefs.lease_length || null,
-            other_requirements: prefs.other_requirements || [],
-            deal_breakers: prefs.deal_breakers || [],
-            priorities: prefs.priorities || null,
-            summary: prefs.summary || null,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id' })
-        if (upsertError) {
-          console.error('Preferences upsert error:', upsertError)
-        } else {
-          preferencesExtracted = true
-        }
-
-        // Sync neighborhoods: replace all active neighborhoods with the newly extracted ones
-        type NeighborhoodInput = { neighborhood: string; city: string; state: string; zip_code?: string | null }
-        const extractedNeighborhoods: NeighborhoodInput[] = Array.isArray(prefs.neighborhoods) ? prefs.neighborhoods : []
-        if (extractedNeighborhoods.length > 0) {
-          await supabase.from('monitored_neighborhoods').delete().eq('user_id', user.id)
-          const { error: neighborhoodError } = await supabase
-            .from('monitored_neighborhoods')
-            .insert(extractedNeighborhoods.map(n => ({
-              user_id: user.id,
-              neighborhood: n.neighborhood,
-              city: n.city,
-              state: n.state.toUpperCase(),
-              zip_code: n.zip_code || null,
-              active: true,
-            })))
-          if (neighborhoodError) console.error('Neighborhoods upsert error:', neighborhoodError)
-        }
-      } catch (parseErr) {
-        console.error('Preferences parse error:', parseErr)
-      }
+    const prefs = shouldExtractPrefs ? extractPreferencesJson(assistantContent) : null
+    if (prefs) {
+      const applied = await applyExtractedPreferences(supabase, user.id, prefs)
+      if (applied) preferencesExtracted = true
     }
 
     // Save updated conversation
