@@ -14,12 +14,13 @@ export default function SignupModal({ sessionId, onClose }: { sessionId: string;
   const [needsConfirm, setNeedsConfirm] = useState(false)
 
   async function migrateAndRedirect() {
-    await fetch('/api/auth/migrate-session', {
+    const res = await fetch('/api/auth/migrate-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId }),
     })
-    router.push('/search/loading')
+    const data = await res.json()
+    router.push(data.searchRunId ? `/search/loading?runId=${data.searchRunId}` : '/search/loading')
   }
 
   async function handleEmailSignup(e: React.FormEvent) {

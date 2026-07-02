@@ -24,7 +24,10 @@ export async function GET(req: NextRequest) {
 
   if (sessionId) {
     const service = await createServiceClient()
-    await migrateAnonSession(supabase, service, data.user.id, sessionId)
+    const result = await migrateAnonSession(supabase, service, data.user.id, sessionId)
+    if (result.ok && 'searchRunId' in result) {
+      return NextResponse.redirect(`${origin}${next}?runId=${result.searchRunId}`)
+    }
   }
 
   return NextResponse.redirect(`${origin}${next}`)
