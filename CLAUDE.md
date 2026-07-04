@@ -28,6 +28,7 @@ https://apartmentbuddy-ai-iyim.vercel.app
 - `src/app/api/apify/webhook/route.ts` — Apify webhook handler (receives results, upserts + scores listings)
 - `src/app/api/cron/monitor/route.ts` — Vercel Cron job for Pro users
 - `src/app/api/test-apify/route.ts` — diagnostic endpoint to confirm Apify connectivity
+- `src/app/api/chat/anonymous/route.ts` — pre-signup onboarding chat, persists to `anon_sessions` (not `chat_sessions`/`chat_messages`, which are for logged-in users)
 - `supabase/schema.sql` — full DB schema (source of truth)
 
 ## Architecture: async scraping via webhooks
@@ -42,7 +43,11 @@ The app uses Apify webhooks to avoid Vercel's 10s timeout:
 - `apify_run_ids` — jsonb map of `{ zillow, apartments_com, craigslist, trulia }` run IDs
 
 ## Supabase migrations
-**Run directly in Supabase SQL Editor** (not via CLI — no migration files):
+**Run directly in Supabase SQL Editor** (not via CLI — no migration files).
+
+**Important:** `schema.sql` is the source of truth for what the schema *should* be, but editing it does nothing by itself — there's no automated apply step, and no tracking of what's actually been run against production. It's easy to add a table/function to `schema.sql` in the same commit as code that depends on it, ship the code, and have it fail in prod because the DDL was never actually executed. (This happened with `anon_sessions` / `migrate_anon_session()` — added to `schema.sql` in the same commit as `/api/chat/anonymous`, but never run against the live DB, so every request silently 500'd until caught.) **Whenever you add or change anything in `schema.sql`, immediately run that exact block in the Supabase SQL Editor before/alongside shipping the code that depends on it** — don't treat updating the file as the migration.
+
+Example (already applied):
 ```sql
 alter table public.search_runs
   add column if not exists apify_runs_pending int not null default 0,

@@ -18,18 +18,38 @@ export async function POST(req: NextRequest) {
 
     const supabase = await createServiceClient()
 
-    let { data: session } = await supabase
+    let { data: session, error: selectError } = await supabase
       .from('anon_sessions')
       .select('*')
       .eq('session_id', sessionId)
       .single()
 
+    // PGRST116 = "no rows found", which just means this session doesn't exist yet.
+    // Any other error (RLS, bad key, missing table, etc.) is a real failure —
+    // don't silently fall through to insert as if the row simply wasn't there.
+    if (selectError && selectError.code !== 'PGRST116') {
+      console.error('anon_sessions select error:', selectError)
+      return NextResponse.json(
+        { error: `Failed to load session: ${selectError.message}` },
+        { status: 500 }
+      )
+    }
+
     if (!session) {
-      const { data: created } = await supabase
+      const { data: created, error: insertError } = await supabase
         .from('anon_sessions')
         .insert({ session_id: sessionId, chat_history: [] })
         .select()
         .single()
+
+      if (insertError) {
+        console.error('anon_sessions insert error:', insertError)
+        return NextResponse.json(
+          { error: `Failed to create session: ${insertError.message}` },
+          { status: 500 }
+        )
+      }
+
       session = created
     }
 
