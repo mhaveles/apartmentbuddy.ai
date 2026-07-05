@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { UserListing } from '@/types'
-import { scoreTier } from '@/lib/scoring-utils'
+import { scoreTier, MIN_DISPLAY_SCORE } from '@/lib/scoring-utils'
 
 export default function ListingsPage() {
   const [listings, setListings] = useState<UserListing[]>([])
@@ -295,7 +295,7 @@ export default function ListingsPage() {
       {searching && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-sm text-indigo-700 flex items-center justify-between">
           <span>
-            Scraping listings and scoring them with AI… this takes 1-2 minutes.
+            Searching listings and scoring them with AI… this takes 1-2 minutes.
             {searchStatus && <span className="ml-2 font-medium capitalize">{searchStatus}</span>}
           </span>
           <button
@@ -329,7 +329,7 @@ export default function ListingsPage() {
 
       {searchTimedOut && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
-          The search is taking longer than expected — the scrapers may have failed to return results. Try running a new search.
+          The search is taking longer than expected — some sources may have failed to return results. Try running a new search.
         </div>
       )}
 
@@ -442,18 +442,26 @@ export default function ListingsPage() {
         <DeepDiveModal listing={deepDiveListing} onClose={() => setDeepDiveListing(null)} />
       )}
 
+      {!loading && listings.length > 0 && (() => {
+        const hiddenCount = listings.filter(ul => ul.score != null && ul.score < MIN_DISPLAY_SCORE).length
+        return hiddenCount > 0 ? (
+          <p className="text-xs text-gray-400">{hiddenCount} weaker match{hiddenCount === 1 ? '' : 'es'} hidden</p>
+        ) : null
+      })()}
+
       <div className="space-y-4">
         {(() => {
+          const visibleListings = listings.filter(ul => ul.score == null || ul.score >= MIN_DISPLAY_SCORE)
           const sourceTopIds = new Set<string>()
           const seenSources = new Set<string>()
-          listings.forEach(ul => {
+          visibleListings.forEach(ul => {
             const source = ul.listing?.source
             if (source && !seenSources.has(source)) {
               seenSources.add(source)
               sourceTopIds.add(ul.id)
             }
           })
-          return listings.map(ul => {
+          return visibleListings.map(ul => {
           const l = ul.listing!
           const isSourceTop = sourceTopIds.has(ul.id)
           return (
@@ -462,15 +470,11 @@ export default function ListingsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <ScoreBadge score={ul.score} />
-                    {ul.rank != null && ul.total != null && (
-                      <span className="text-xs text-gray-400">#{ul.rank} of {ul.total}</span>
-                    )}
-                    <span className="text-xs text-gray-400 capitalize">{l?.source?.replace('_', '.')}</span>
-                    {isSourceTop && (
-                      <span className="text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded-full font-medium">
-                        Top on {sourceLabel(l?.source)}
-                      </span>
-                    )}
+                    <span className="text-xs text-gray-400">
+                      {ul.rank != null && ul.total != null ? `#${ul.rank} of ${ul.total} · ` : ''}
+                      {sourceLabel(l?.source)}
+                      {isSourceTop ? ' · Top match' : ''}
+                    </span>
                   </div>
                   <p className="font-semibold text-gray-900 truncate">{l?.address || l?.title || 'Listing'}</p>
                   <p className="text-sm text-gray-500">
@@ -522,24 +526,10 @@ export default function ListingsPage() {
                   </div>
                 </div>
               </div>
-              {ul.score_reasoning && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  <p className="text-xs text-gray-500 leading-relaxed">{ul.score_reasoning}</p>
-                </div>
-              )}
-              {ul.score_breakdown && (
-                <div className="mt-2 flex gap-2 flex-wrap">
-                  {Object.entries(ul.score_breakdown).map(([key, val]) => (
-                    <span key={key} className="text-xs bg-gray-50 border border-gray-100 px-2 py-0.5 rounded text-gray-500">
-                      {key}: <strong>{String(val)}</strong>
-                    </span>
-                  ))}
-                </div>
-              )}
               {ul.score != null && (
                 <button
                   onClick={() => setDeepDiveListing(ul)}
-                  className="mt-2 text-xs text-indigo-400 hover:text-indigo-600"
+                  className="mt-3 pt-3 border-t border-gray-100 text-xs text-indigo-400 hover:text-indigo-600"
                 >
                   Why this score?
                 </button>

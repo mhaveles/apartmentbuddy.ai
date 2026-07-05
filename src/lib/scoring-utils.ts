@@ -1,3 +1,6 @@
+// Listings scoring below this are considered poor fits and hidden from results.
+export const MIN_DISPLAY_SCORE = 50
+
 export function scoreTier(score: number): string {
   if (score >= 80) return 'Strong Match'
   if (score >= 60) return 'Good Match'
