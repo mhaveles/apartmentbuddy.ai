@@ -97,6 +97,30 @@ async function startActor(actorId: string, input: unknown, webhooks: unknown[]):
   return data.data.id as string
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// Trulia's actor start / dataset fetch has been observed to fail transiently upstream
+// (e.g. "service: graphql error: Internal Server Error" from Trulia's own backend).
+// Retry with backoff rather than silently dropping the source for the whole search run.
+async function withRetry<T>(label: string, fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      if (attempt < maxAttempts) {
+        const delay = 500 * 2 ** (attempt - 1)
+        console.warn(`[TRULIA] ${label} attempt ${attempt}/${maxAttempts} failed: ${(err as Error).message}. Retrying in ${delay}ms`)
+        await sleep(delay)
+      }
+    }
+  }
+  throw lastErr
+}
+
 export async function startZillowScrape(
   neighborhoods: Neighborhood,
   webhookUrl: string,
@@ -231,7 +255,7 @@ export async function startTruliaScrape(
     ...(preferences?.parking_required ? ['garage'] : []),
   ]
 
-  return startActor('igolaizola/trulia-scraper', {
+  return withRetry('startActor', () => startActor('igolaizola/trulia-scraper', {
     location,
     operation: 'rent',
     sortBy: 'best',
@@ -250,7 +274,7 @@ export async function startTruliaScrape(
     ...(pets.length > 0                      && { pets }),
     ...(unitAmenities.length > 0             && { unitAmenities }),
     ...(buildingAmenities.length > 0         && { buildingAmenities }),
-  }, buildWebhooks(webhookUrl, searchRunId, 'trulia'))
+  }, buildWebhooks(webhookUrl, searchRunId, 'trulia')))
 }
 
 export async function fetchScrapedListingsByRunId(
@@ -261,6 +285,13 @@ export async function fetchScrapedListingsByRunId(
   if (!res.ok) throw new Error(`Failed to fetch dataset for run ${runId}: ${res.status}`)
   const items: Record<string, unknown>[] = await res.json()
   return mapListings(items, source)
+}
+
+// Trulia-only: retries the dataset fetch with backoff. A transient Apify API error here
+// previously meant the source's apify_runs_pending counter still decremented (webhook
+// decrements first) while the listings themselves were never fetched or saved.
+export async function fetchTruliaListingsByRunId(runId: string): Promise<ScrapedListing[]> {
+  return withRetry('dataset fetch', () => fetchScrapedListingsByRunId(runId, 'trulia'))
 }
 
 // Apartments are typically 100–4000 sqft. Values outside this range are almost always
@@ -454,7 +485,7 @@ function validateCraigslistItem(item: Record<string, unknown>): ScrapedListing |
 
 function validateTruliaItem(item: Record<string, unknown>): ScrapedListing | null {
   // igolaizola/trulia-scraper returns nested objects — access via typed casts
-  type Loc = { city?: string; stateCode?: string; zipCode?: string; streetAddress?: string; formattedLocation?: string; neighborhood?: string | null }
+  type Loc = { city?: string; stateCode?: string; zipCode?: string; streetAddress?: string; formattedLocation?: string; neighborhoodName?: string | null }
   type Beds = { formattedValue?: string }
   type Floor = { formattedDimension?: string }
   type Meta = { typedHomeId?: string }
@@ -527,8 +558,8 @@ function validateTruliaItem(item: Record<string, unknown>): ScrapedListing | nul
   const photos = (item.media as Media | undefined)?.photos || []
   const images = photos.map(p => p.url?.large).filter((u): u is string => !!u)
 
-  // Confirmed field name from actor docs: location.neighborhood (not .neighborhoodName)
-  const neighborhood = loc?.neighborhood || null
+  // Raw actor output uses location.neighborhoodName (verified against live dataset July 2026)
+  const neighborhood = loc?.neighborhoodName || null
 
   return {
     externalId,

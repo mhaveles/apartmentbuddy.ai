@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { fetchScrapedListingsByRunId } from '@/lib/apify'
+import { fetchScrapedListingsByRunId, fetchTruliaListingsByRunId } from '@/lib/apify'
 import { getAnthropic, SCORING_PROMPT, fetchListingImages } from '@/lib/anthropic'
 import { buildVotedContext, type VotedRow } from '@/lib/scoring-utils'
 
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     // Fetch preferences, listings, and voted examples in parallel
     const [prefResult, listings, likedResult, dislikedResult] = await Promise.all([
       supabase.from('preferences').select('*').eq('user_id', userId).single(),
-      fetchScrapedListingsByRunId(resolvedRunId, source),
+      source === 'trulia' ? fetchTruliaListingsByRunId(resolvedRunId) : fetchScrapedListingsByRunId(resolvedRunId, source),
       supabase
         .from('user_listings')
         .select('vote, score_breakdown, listing:listings(address, neighborhood, city, rent, bedrooms, bathrooms, sqft, amenities)')
