@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
     .from('user_listings')
     .select(`
       *,
-      listing:listings(*)
+      listing:listings(*),
+      search_run:search_runs(neighborhood_id, neighborhood_label)
     `)
     .eq('user_id', user.id)
     .eq('is_dismissed', false)

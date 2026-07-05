@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { UserListing } from '@/types'
+import Link from 'next/link'
+import { UserListing, Neighborhood, SearchRun } from '@/types'
 import { scoreTier, MIN_DISPLAY_SCORE } from '@/lib/scoring-utils'
 
 export default function ListingsPage() {
@@ -10,6 +11,10 @@ export default function ListingsPage() {
   const [searching, setSearching] = useState(false)
   const [searchRunId, setSearchRunId] = useState<string | null>(null)
   const [savedOnly, setSavedOnly] = useState(false)
+  const [plan, setPlan] = useState('free')
+  const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([])
+  const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState('')
+  const [activeNeighborhoodTab, setActiveNeighborhoodTab] = useState('all')
   const [searchStatus, setSearchStatus] = useState<string | null>(null)
   const [searchTimedOut, setSearchTimedOut] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
@@ -55,12 +60,29 @@ export default function ListingsPage() {
     }).catch(() => { /* non-critical */ })
   }, [loadListings, checkAvailability])
 
-  // On load, resume polling if there's an in-progress search (up to 12 min old)
+  // On load: fetch monitored neighborhoods + plan (for the single-neighborhood picker),
+  // resume polling if there's an in-progress search (up to 12 min old), and default the
+  // picker to whichever neighborhood was searched most recently.
   useEffect(() => {
-    async function checkRunning() {
-      const res = await fetch('/api/search')
-      const runs = await res.json()
+    async function init() {
+      const [neighData, runs] = await Promise.all([
+        fetch('/api/neighborhoods').then(r => r.json()),
+        fetch('/api/search').then(r => r.json()),
+      ])
+
+      const list: Neighborhood[] = neighData?.neighborhoods || []
+      setNeighborhoods(list)
+      setPlan(neighData?.plan || 'free')
+
       if (Array.isArray(runs) && runs.length > 0) setHasSearched(true)
+
+      const lastWithNeighborhood = Array.isArray(runs)
+        ? (runs as SearchRun[]).find(r => r.neighborhood_id)
+        : null
+      const preferredId = lastWithNeighborhood?.neighborhood_id
+      const validPreferred = preferredId && list.some(n => n.id === preferredId) ? preferredId : null
+      setSelectedNeighborhoodId(validPreferred || list[0]?.id || '')
+
       const twelveMinAgo = new Date(Date.now() - 12 * 60 * 1000).toISOString()
       const running = Array.isArray(runs)
         ? runs.find((r: { status: string; id: string; started_at: string }) =>
@@ -73,7 +95,7 @@ export default function ListingsPage() {
         pollStartRef.current = Date.now()
       }
     }
-    checkRunning()
+    init()
   }, [])
 
   // Poll search run status — bail after 12 min, retry on transient errors
@@ -133,7 +155,11 @@ export default function ListingsPage() {
     setSearchStatus('running')
     setScraperWarnings([])
     setSearchTimedOut(false)
-    const res = await fetch('/api/search', { method: 'POST' })
+    const res = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(plan !== 'pro' ? { neighborhoodId: selectedNeighborhoodId } : {}),
+    })
     const data = await res.json()
     if (data.error) {
       if (data.paywall) {
@@ -200,6 +226,13 @@ export default function ListingsPage() {
   useEffect(() => {
     if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
   }, [checkInMessages])
+
+  // Reset to "All" if the selected neighborhood tab no longer has any listings
+  useEffect(() => {
+    if (activeNeighborhoodTab === 'all') return
+    const stillExists = listings.some(ul => ul.search_run?.neighborhood_label === activeNeighborhoodTab)
+    if (!stillExists) setActiveNeighborhoodTab('all')
+  }, [listings, activeNeighborhoodTab])
 
   async function sendCheckIn() {
     const text = checkInInput.trim()
@@ -282,9 +315,26 @@ export default function ListingsPage() {
           >
             {rescoring ? 'Re-scoring…' : 'Re-score'}
           </button>
+          {plan !== 'pro' && neighborhoods.length > 0 && (
+            <select
+              value={selectedNeighborhoodId}
+              onChange={e => setSelectedNeighborhoodId(e.target.value)}
+              disabled={searching}
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              {neighborhoods.map(n => (
+                <option key={n.id} value={n.id}>{n.neighborhood}, {n.city}</option>
+              ))}
+            </select>
+          )}
+          {plan !== 'pro' && neighborhoods.length === 0 && (
+            <Link href="/neighborhoods" className="text-xs text-indigo-600 self-center hover:underline">
+              Add a neighborhood first
+            </Link>
+          )}
           <button
             onClick={runSearch}
-            disabled={searching}
+            disabled={searching || (plan !== 'pro' && neighborhoods.length === 0)}
             className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
           >
             {searching ? 'Searching…' : 'Run search'}
@@ -449,9 +499,35 @@ export default function ListingsPage() {
         ) : null
       })()}
 
+      {!loading && listings.length > 0 && (() => {
+        const labels = Array.from(new Set(
+          listings.map(ul => ul.search_run?.neighborhood_label).filter((l): l is string => !!l)
+        ))
+        if (labels.length === 0) return null
+        const tabClass = (active: boolean) =>
+          `px-3 py-2 text-sm font-medium border-b-2 -mb-px ${
+            active ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`
+        return (
+          <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+            <button onClick={() => setActiveNeighborhoodTab('all')} className={tabClass(activeNeighborhoodTab === 'all')}>
+              All
+            </button>
+            {labels.map(label => (
+              <button key={label} onClick={() => setActiveNeighborhoodTab(label)} className={tabClass(activeNeighborhoodTab === label)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )
+      })()}
+
       <div className="space-y-4">
         {(() => {
-          const visibleListings = listings.filter(ul => ul.score == null || ul.score >= MIN_DISPLAY_SCORE)
+          const visibleListings = listings.filter(ul =>
+            (ul.score == null || ul.score >= MIN_DISPLAY_SCORE) &&
+            (activeNeighborhoodTab === 'all' || ul.search_run?.neighborhood_label === activeNeighborhoodTab)
+          )
           const sourceTopIds = new Set<string>()
           const seenSources = new Set<string>()
           visibleListings.forEach(ul => {

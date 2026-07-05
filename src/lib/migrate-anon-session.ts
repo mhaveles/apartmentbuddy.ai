@@ -5,6 +5,7 @@ import { triggerSearchForUser } from '@/lib/search-trigger'
 export type MigrateAnonSessionResult =
   | { ok: true; searchRunId: string }
   | { ok: true; searchError: string }
+  | { ok: true; needsNeighborhood: true }
   | { ok: false; status: number; error: string }
 
 // Marks an anon session converted, migrates its preferences_json into the new
@@ -38,8 +39,17 @@ export async function migrateAnonSession(
   }
 
   const prefs = (migrated as { preferences_json: Record<string, unknown> | null }).preferences_json
+  let hasNeighborhoods = false
   if (prefs) {
-    await applyExtractedPreferences(supabase, userId, prefs)
+    const applied = await applyExtractedPreferences(supabase, userId, prefs)
+    hasNeighborhoods = applied.hasNeighborhoods
+  }
+
+  // The pre-signup chat never confirmed a neighborhood (or it failed validation) —
+  // triggerSearchForUser would just fail with the same generic error, so skip straight
+  // to telling the caller this user needs to add one before any search can run.
+  if (!hasNeighborhoods) {
+    return { ok: true, needsNeighborhood: true }
   }
 
   const searchResult = await triggerSearchForUser(supabase, userId)

@@ -25,6 +25,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: result.status })
   }
 
+  if ('needsNeighborhood' in result) {
+    return NextResponse.json({ migrated: true, needsNeighborhood: true })
+  }
+
   if ('searchError' in result) {
     return NextResponse.json({ migrated: true, searchError: result.searchError })
   }

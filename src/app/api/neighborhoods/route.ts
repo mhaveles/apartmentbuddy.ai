@@ -7,13 +7,16 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data } = await supabase
-    .from('monitored_neighborhoods')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
+  const [{ data }, { data: profile }] = await Promise.all([
+    supabase
+      .from('monitored_neighborhoods')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }),
+    supabase.from('profiles').select('plan').eq('id', user.id).single(),
+  ])
 
-  return NextResponse.json(data || [])
+  return NextResponse.json({ neighborhoods: data || [], plan: profile?.plan || 'free' })
 }
 
 export async function POST(req: NextRequest) {

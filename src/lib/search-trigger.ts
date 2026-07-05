@@ -9,7 +9,11 @@ export type TriggerSearchResult =
 // Starts a search run for a user: credit check, fetch preferences/neighborhoods,
 // insert a search_runs row, fire the scraper actors, record their run IDs.
 // Shared by the authenticated /api/search endpoint and the post-signup auto-fire path.
-export async function triggerSearchForUser(supabase: SupabaseClient, userId: string): Promise<TriggerSearchResult> {
+//
+// Pro users always search every active monitored neighborhood at once (continuous
+// monitoring). Free/pay-per-credit users search one neighborhood per run — `neighborhoodId`
+// selects which one; it's ignored for Pro.
+export async function triggerSearchForUser(supabase: SupabaseClient, userId: string, neighborhoodId?: string): Promise<TriggerSearchResult> {
   const creditCheck = await checkCredits(supabase, userId)
 
   if (!creditCheck.allowed) {
@@ -31,11 +35,48 @@ export async function triggerSearchForUser(supabase: SupabaseClient, userId: str
     return { ok: false, status: 400, error: 'Please complete the preferences chat first.' }
   }
 
-  const { data: neighborhoods } = await supabase
-    .from('monitored_neighborhoods')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('active', true)
+  const isPro = creditCheck.plan === 'pro'
+
+  let neighborhoods: Array<{ id: string; neighborhood: string; city: string; state: string; zip_code: string | null; map_bounds?: { north: number; south: number; east: number; west: number } | null }>
+  let runNeighborhoodId: string | null = null
+  let runNeighborhoodLabel: string | null = null
+
+  if (isPro) {
+    const { data } = await supabase
+      .from('monitored_neighborhoods')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('active', true)
+    neighborhoods = data || []
+  } else {
+    let selected = null
+    if (neighborhoodId) {
+      const { data } = await supabase
+        .from('monitored_neighborhoods')
+        .select('*')
+        .eq('id', neighborhoodId)
+        .eq('user_id', userId)
+        .eq('active', true)
+        .single()
+      selected = data
+    }
+    if (!selected) {
+      const { data } = await supabase
+        .from('monitored_neighborhoods')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      selected = data
+    }
+    neighborhoods = selected ? [selected] : []
+    if (selected) {
+      runNeighborhoodId = selected.id
+      runNeighborhoodLabel = `${selected.neighborhood}, ${selected.city}, ${selected.state}`
+    }
+  }
 
   if (!neighborhoods || neighborhoods.length === 0) {
     return { ok: false, status: 400, error: 'Please add at least one neighborhood to monitor.' }
@@ -46,6 +87,8 @@ export async function triggerSearchForUser(supabase: SupabaseClient, userId: str
     .insert({
       user_id: userId,
       neighborhoods: neighborhoods.map(n => `${n.neighborhood}, ${n.city}, ${n.state}`),
+      neighborhood_id: runNeighborhoodId,
+      neighborhood_label: runNeighborhoodLabel,
       status: 'running',
       apify_runs_pending: 1,
       started_at: new Date().toISOString(),

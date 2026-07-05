@@ -13,13 +13,22 @@ export function extractPreferencesJson(text: string): Record<string, unknown> | 
   }
 }
 
+export type ApplyPreferencesResult = {
+  preferencesSaved: boolean
+  // Reflects the user's actual current state after this call — true if they have at
+  // least one active monitored neighborhood, whether it was touched this turn or already
+  // existed. A run can't start without this, so callers should check it before telling
+  // the user they're ready to search.
+  hasNeighborhoods: boolean
+}
+
 // Upserts a parsed preferences JSON block into `preferences` and replaces the user's
-// active `monitored_neighborhoods` with the extracted set. Returns whether it succeeded.
+// active `monitored_neighborhoods` with the extracted set (if valid).
 export async function applyExtractedPreferences(
   supabase: SupabaseClient,
   userId: string,
   prefs: Record<string, unknown>
-): Promise<boolean> {
+): Promise<ApplyPreferencesResult> {
   const p = prefs as {
     max_rent?: number
     min_bedrooms?: number
@@ -71,24 +80,41 @@ export async function applyExtractedPreferences(
 
   if (upsertError) {
     console.error('Preferences upsert error:', upsertError)
-    return false
+    return { preferencesSaved: false, hasNeighborhoods: false }
   }
 
+  // Validate before writing — a single malformed entry would otherwise fail the whole
+  // insert (NOT NULL violation), and since we delete-then-insert, that means a bad model
+  // turn wipes the user's existing neighborhoods and replaces them with nothing.
   const extractedNeighborhoods = Array.isArray(p.neighborhoods) ? p.neighborhoods : []
-  if (extractedNeighborhoods.length > 0) {
+  const validNeighborhoods = extractedNeighborhoods.filter(n =>
+    n && typeof n.neighborhood === 'string' && n.neighborhood.trim() &&
+    typeof n.city === 'string' && n.city.trim() &&
+    typeof n.state === 'string' && n.state.trim()
+  )
+
+  if (validNeighborhoods.length > 0) {
     await supabase.from('monitored_neighborhoods').delete().eq('user_id', userId)
     const { error: neighborhoodError } = await supabase
       .from('monitored_neighborhoods')
-      .insert(extractedNeighborhoods.map(n => ({
+      .insert(validNeighborhoods.map(n => ({
         user_id: userId,
-        neighborhood: n.neighborhood,
-        city: n.city,
-        state: n.state.toUpperCase(),
+        neighborhood: n.neighborhood.trim(),
+        city: n.city.trim(),
+        state: n.state.trim().toUpperCase(),
         zip_code: n.zip_code || null,
         active: true,
       })))
     if (neighborhoodError) console.error('Neighborhoods upsert error:', neighborhoodError)
+  } else if (extractedNeighborhoods.length > 0) {
+    console.error('All extracted neighborhoods failed validation, leaving existing rows untouched:', extractedNeighborhoods)
   }
 
-  return true
+  const { count } = await supabase
+    .from('monitored_neighborhoods')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('active', true)
+
+  return { preferencesSaved: true, hasNeighborhoods: (count ?? 0) > 0 }
 }

@@ -10,7 +10,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const result = await triggerSearchForUser(supabase, user.id)
+  const body = await req.json().catch(() => ({}))
+  const result = await triggerSearchForUser(supabase, user.id, body?.neighborhoodId)
 
   if (!result.ok) {
     return NextResponse.json(

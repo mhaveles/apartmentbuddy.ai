@@ -43,6 +43,11 @@ export default function SignupPage() {
             router.push('/search/loading?runId=' + migration.searchRunId)
             return
           }
+          if (res.ok && migration.needsNeighborhood) {
+            clearAnonSessionId()
+            router.push('/neighborhoods?onboarding=1')
+            return
+          }
         } catch {
           // fall through to default redirect
         }

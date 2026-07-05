@@ -15,6 +15,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [preferencesExtracted, setPreferencesExtracted] = useState(false)
+  const [hasNeighborhoods, setHasNeighborhoods] = useState(true)
   const [onboardingSessionId, setOnboardingSessionId] = useState<string | null>(null)
   const [restoring, setRestoring] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -35,6 +36,14 @@ export default function ChatPage() {
     async function restore() {
       let hasPreferences = false
 
+      let prefs: Record<string, unknown> | null = null
+      try {
+        const prefsRes = await fetch('/api/preferences')
+        if (prefsRes.ok) prefs = await prefsRes.json()
+      } catch {}
+      const neighborhoodsList = Array.isArray(prefs?.neighborhoods) ? prefs!.neighborhoods as unknown[] : []
+      setHasNeighborhoods(neighborhoodsList.length > 0)
+
       try {
         const res = await fetch('/api/conversations/latest')
         if (res.ok) {
@@ -48,15 +57,7 @@ export default function ChatPage() {
         }
       } catch {}
 
-      if (!hasPreferences) {
-        try {
-          const prefsRes = await fetch('/api/preferences')
-          if (prefsRes.ok) {
-            const prefs = await prefsRes.json()
-            if (Object.keys(prefs).length > 0) hasPreferences = true
-          }
-        } catch {}
-      }
+      if (!hasPreferences && prefs && Object.keys(prefs).length > 0) hasPreferences = true
 
       if (!hasPreferences) {
         const existing = sessionStorage.getItem('onboardingSessionId')
@@ -121,6 +122,7 @@ export default function ChatPage() {
       } else {
         setMessages(prev => [...prev, data.message])
         setConversationId(data.conversationId)
+        if (typeof data.hasNeighborhoods === 'boolean') setHasNeighborhoods(data.hasNeighborhoods)
         if (data.preferencesExtracted) {
           setPreferencesExtracted(true)
           if (onboardingSessionId) {
@@ -182,10 +184,17 @@ export default function ChatPage() {
         )}
       </div>
 
-      {preferencesExtracted && (
+      {preferencesExtracted && hasNeighborhoods && (
         <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 mb-4 flex items-center justify-between">
           <span><span className="mr-1">✓</span> Got your preferences. <a href="/listings" className="font-medium underline">Run your first search</a> to see matching listings.</span>
           <button onClick={startFresh} className="text-xs text-green-600 hover:text-green-800 underline ml-4 shrink-0">Update preferences</button>
+        </div>
+      )}
+
+      {preferencesExtracted && !hasNeighborhoods && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800 mb-4 flex items-center justify-between">
+          <span><span className="mr-1">⚠</span> Got your other preferences, but I still need at least one neighborhood to search. <a href="/neighborhoods" className="font-medium underline">Add one</a> to get started.</span>
+          <button onClick={startFresh} className="text-xs text-amber-700 hover:text-amber-900 underline ml-4 shrink-0">Update preferences</button>
         </div>
       )}
 

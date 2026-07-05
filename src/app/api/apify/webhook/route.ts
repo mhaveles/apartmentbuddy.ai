@@ -286,6 +286,7 @@ export async function POST(req: NextRequest) {
                 score_breakdown: scoreData.breakdown,
                 score_reasoning: scoreData.reasoning,
                 sources: [listing.source],
+                search_run_id: searchRunId,
               })
               return 1
             }

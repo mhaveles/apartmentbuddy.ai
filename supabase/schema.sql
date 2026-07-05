@@ -88,6 +88,24 @@ create table public.listings (
   unique(external_id, source)
 );
 
+-- Search runs (tracks when scraping was triggered)
+create table public.search_runs (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  neighborhoods text[],
+  neighborhood_id uuid references public.monitored_neighborhoods(id) on delete set null, -- set only for single-neighborhood runs (free/pay-per-credit)
+  neighborhood_label text, -- denormalized "Neighborhood, City, ST" snapshot, survives deletion of the neighborhood row
+  listings_found integer default 0,
+  listings_scored integer default 0,
+  status text not null default 'pending', -- 'pending' | 'running' | 'completed' | 'failed'
+  error text,
+  apify_runs_pending int not null default 0,
+  apify_run_ids jsonb not null default '{}',
+  started_at timestamptz,
+  completed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 -- Scored listings per user
 create table public.user_listings (
   id uuid primary key default uuid_generate_v4(),
@@ -101,24 +119,9 @@ create table public.user_listings (
   is_saved boolean not null default false,
   is_dismissed boolean not null default false,
   notified_at timestamptz,
+  search_run_id uuid references public.search_runs(id) on delete set null, -- which run surfaced this listing (ties it to a neighborhood via search_runs.neighborhood_id)
   created_at timestamptz not null default now(),
   unique(user_id, listing_id)
-);
-
--- Search runs (tracks when scraping was triggered)
-create table public.search_runs (
-  id uuid primary key default uuid_generate_v4(),
-  user_id uuid references public.profiles(id) on delete cascade not null,
-  neighborhoods text[],
-  listings_found integer default 0,
-  listings_scored integer default 0,
-  status text not null default 'pending', -- 'pending' | 'running' | 'completed' | 'failed'
-  error text,
-  apify_runs_pending int not null default 0,
-  apify_run_ids jsonb not null default '{}',
-  started_at timestamptz,
-  completed_at timestamptz,
-  created_at timestamptz not null default now()
 );
 
 -- Migration: add apify tracking columns to existing search_runs tables
@@ -202,6 +205,15 @@ $$ language sql security definer;
 --   where id = ul_id
 --     and not (coalesce(sources, array[]::text[]) @> array[new_source]::text[]);
 -- $$ language sql security definer;
+
+-- Migration: single-neighborhood search selection + per-listing neighborhood attribution
+-- Run in Supabase SQL Editor:
+-- alter table public.search_runs
+--   add column if not exists neighborhood_id uuid references public.monitored_neighborhoods(id) on delete set null,
+--   add column if not exists neighborhood_label text;
+--
+-- alter table public.user_listings
+--   add column if not exists search_run_id uuid references public.search_runs(id) on delete set null;
 
 -- Function to refund a search credit on failed runs
 create or replace function public.decrement_searches_used(user_id uuid)

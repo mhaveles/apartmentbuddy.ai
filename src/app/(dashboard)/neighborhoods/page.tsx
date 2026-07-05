@@ -1,9 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Neighborhood } from '@/types'
 
-export default function NeighborhoodsPage() {
+function NeighborhoodsContent() {
+  const searchParams = useSearchParams()
+  const isOnboarding = searchParams.get('onboarding') === '1'
   const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -13,7 +16,7 @@ export default function NeighborhoodsPage() {
   useEffect(() => {
     fetch('/api/neighborhoods')
       .then(r => r.json())
-      .then(data => { setNeighborhoods(data); setLoading(false) })
+      .then(data => { setNeighborhoods(data.neighborhoods || []); setLoading(false) })
   }, [])
 
   async function addNeighborhood(e: React.FormEvent) {
@@ -46,6 +49,12 @@ export default function NeighborhoodsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Neighborhoods</h1>
         <p className="text-gray-500 text-sm mt-1">Add areas to monitor for new listings.</p>
       </div>
+
+      {isOnboarding && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-800">
+          Almost there — add at least one neighborhood below so we know where to search.
+        </div>
+      )}
 
       {/* Add form */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
@@ -128,5 +137,13 @@ export default function NeighborhoodsPage() {
         ))}
       </div>
     </div>
+  )
+}
+
+export default function NeighborhoodsPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-gray-400">Loading…</div>}>
+      <NeighborhoodsContent />
+    </Suspense>
   )
 }

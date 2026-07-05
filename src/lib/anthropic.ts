@@ -73,6 +73,8 @@ When gathering location info, always ask for:
 - The city and state
 - ZIP code if they know it (helpful for precise searching)
 
+A city or ZIP alone is not enough — every search is scoped to a specific neighborhood entry, so "location" isn't confirmed until you have at least one. If the user has no specific area in mind (e.g. "anywhere in Denver is fine"), don't guess a neighborhood for them — ask once whether there's a part of the city they'd rule in or out; if they still don't care, use the city name itself as the "neighborhood" value (e.g. "Denver") rather than inventing one. Never fabricate a specific neighborhood name the user didn't mention. Do not output the JSON block until you have at least one complete neighborhood entry this way — it's a hard requirement, not just a nice-to-have field.
+
 When you have confirmed preferences with the user, output a structured JSON block (wrapped in \`\`\`json ... \`\`\`) with this exact shape:
 
 \`\`\`json
@@ -153,7 +155,9 @@ When the user confirms an update, output the full updated preferences as a \`\`\
 }
 \`\`\`
 
-Only output the JSON block when the user explicitly confirms a change. Do not output it speculatively or mid-question.`
+Only output the JSON block when the user explicitly confirms a change. Do not output it speculatively or mid-question.
+
+The "neighborhoods" array must always contain at least one entry, even if the user isn't updating location this turn — carry forward what they already have. Never output an empty "neighborhoods" array; every search depends on it having at least one entry.`
 
 export const CHECK_IN_PROMPT = `You are ApartmentBuddy. You are helping a user review what the AI has inferred about their priorities based on how they have been voting on listings.
 

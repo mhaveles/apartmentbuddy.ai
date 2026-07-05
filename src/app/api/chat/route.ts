@@ -67,11 +67,13 @@ export async function POST(req: NextRequest) {
 
     // Check if preferences JSON is in the response (only relevant for onboarding/refinement)
     let preferencesExtracted = conversation.preferences_extracted
+    let hasNeighborhoods: boolean | undefined
     const shouldExtractPrefs = !intent || intent === 'onboarding' || intent === 'refinement'
     const prefs = shouldExtractPrefs ? extractPreferencesJson(assistantContent) : null
     if (prefs) {
       const applied = await applyExtractedPreferences(supabase, user.id, prefs)
-      if (applied) preferencesExtracted = true
+      if (applied.preferencesSaved) preferencesExtracted = true
+      hasNeighborhoods = applied.hasNeighborhoods
     }
 
     // Save updated conversation
@@ -88,6 +90,7 @@ export async function POST(req: NextRequest) {
       message: newAssistantMessage,
       conversationId: conversation.id,
       preferencesExtracted,
+      ...(hasNeighborhoods !== undefined && { hasNeighborhoods }),
     })
   } catch (err) {
     console.error('Chat error:', err)

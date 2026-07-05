@@ -95,12 +95,15 @@ export interface UserListing {
   rank?: number
   total?: number
   listing?: Listing
+  search_run?: { neighborhood_id: string | null; neighborhood_label: string | null } | null
 }
 
 export interface SearchRun {
   id: string
   user_id: string
   neighborhoods: string[]
+  neighborhood_id?: string | null
+  neighborhood_label?: string | null
   listings_found: number
   listings_scored: number
   status: 'pending' | 'running' | 'completed' | 'failed'

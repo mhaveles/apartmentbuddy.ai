@@ -28,6 +28,9 @@ export async function GET(req: NextRequest) {
     if (result.ok && 'searchRunId' in result) {
       return NextResponse.redirect(`${origin}${next}?runId=${result.searchRunId}`)
     }
+    if (result.ok && 'needsNeighborhood' in result) {
+      return NextResponse.redirect(`${origin}/neighborhoods?onboarding=1`)
+    }
   }
 
   return NextResponse.redirect(`${origin}${next}`)
