@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { clearAnonSessionId } from '@/lib/anon-session-cookie'
 
 export default function SignupModal({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
   const router = useRouter()
@@ -14,13 +15,37 @@ export default function SignupModal({ sessionId, onClose }: { sessionId: string;
   const [needsConfirm, setNeedsConfirm] = useState(false)
 
   async function migrateAndRedirect() {
-    const res = await fetch('/api/auth/migrate-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId }),
-    })
-    const data = await res.json()
-    router.push(data.searchRunId ? `/search/loading?runId=${data.searchRunId}` : '/search/loading')
+    try {
+      const res = await fetch('/api/auth/migrate-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      })
+      const data = await res.json()
+
+      if (res.ok && data.searchRunId) {
+        clearAnonSessionId()
+        router.push(`/search/loading?runId=${data.searchRunId}`)
+        return
+      }
+      if (res.ok && data.needsNeighborhood) {
+        clearAnonSessionId()
+        router.push('/neighborhoods?onboarding=1')
+        return
+      }
+      if (res.ok && data.searchError) {
+        // Conversation + preferences + neighborhoods migrated fine — only the
+        // scrape trigger failed. Send them to the retry surface, not a blind redirect.
+        clearAnonSessionId()
+        router.push('/listings?searchError=1')
+        return
+      }
+      // 404 (session not found) or 409 (already converted elsewhere) — nothing
+      // migrated here. Flag it so /chat doesn't render an unexplained blank slate.
+      router.push('/chat?intakeIssue=1')
+    } catch {
+      router.push('/chat?intakeIssue=1')
+    }
   }
 
   async function handleEmailSignup(e: React.FormEvent) {
