@@ -48,8 +48,20 @@ export default function SignupPage() {
             router.push('/neighborhoods?onboarding=1')
             return
           }
+          if (res.ok && migration.searchError) {
+            // Conversation + preferences + neighborhoods migrated fine — only the
+            // scrape trigger failed. Send them to the retry surface, not a blank chat.
+            clearAnonSessionId()
+            router.push('/listings?searchError=1')
+            return
+          }
+          // 404 (session not found) or 409 (already converted elsewhere) — nothing
+          // migrated here. Flag it so /chat doesn't render an unexplained blank slate.
+          router.push('/chat?intakeIssue=1')
+          return
         } catch {
-          // fall through to default redirect
+          router.push('/chat?intakeIssue=1')
+          return
         }
       }
       router.push('/chat')

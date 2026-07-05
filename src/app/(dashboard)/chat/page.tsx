@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Message } from '@/types'
 
 const INITIAL_MESSAGE: Message = {
@@ -9,7 +10,9 @@ const INITIAL_MESSAGE: Message = {
   timestamp: new Date().toISOString(),
 }
 
-export default function ChatPage() {
+function ChatContent() {
+  const searchParams = useSearchParams()
+  const hadIntakeIssue = searchParams.get('intakeIssue') === '1'
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -184,6 +187,12 @@ export default function ChatPage() {
         )}
       </div>
 
+      {hadIntakeIssue && !conversationId && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600 mb-4">
+          We couldn&apos;t recover the answers from your earlier chat — no worries, let&apos;s pick up here.
+        </div>
+      )}
+
       {preferencesExtracted && hasNeighborhoods && (
         <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 mb-4 flex items-center justify-between">
           <span><span className="mr-1">✓</span> Got your preferences. <a href="/listings" className="font-medium underline">Run your first search</a> to see matching listings.</span>
@@ -246,5 +255,13 @@ export default function ChatPage() {
         </button>
       </form>
     </div>
+  )
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-gray-400">Loading…</div>}>
+      <ChatContent />
+    </Suspense>
   )
 }

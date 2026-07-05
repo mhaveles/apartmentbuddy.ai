@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { applyExtractedPreferences } from '@/lib/preferences'
 import { triggerSearchForUser } from '@/lib/search-trigger'
+import { Message } from '@/types'
 
 export type MigrateAnonSessionResult =
   | { ok: true; searchRunId: string }
@@ -39,6 +40,21 @@ export async function migrateAnonSession(
   }
 
   const prefs = (migrated as { preferences_json: Record<string, unknown> | null }).preferences_json
+  const chatHistory = (migrated as { chat_history: Message[] | null }).chat_history
+
+  if (chatHistory && chatHistory.length > 0) {
+    const { error: conversationError } = await supabase
+      .from('conversations')
+      .insert({
+        user_id: userId,
+        messages: chatHistory,
+        preferences_extracted: !!prefs,
+      })
+    if (conversationError) {
+      console.error('Failed to migrate conversation history:', conversationError)
+    }
+  }
+
   let hasNeighborhoods = false
   if (prefs) {
     const applied = await applyExtractedPreferences(supabase, userId, prefs)

@@ -31,6 +31,12 @@ export async function GET(req: NextRequest) {
     if (result.ok && 'needsNeighborhood' in result) {
       return NextResponse.redirect(`${origin}/neighborhoods?onboarding=1`)
     }
+    if (result.ok && 'searchError' in result) {
+      // Migrated fine — only the scrape trigger failed. Send them to the retry surface.
+      return NextResponse.redirect(`${origin}/listings?searchError=1`)
+    }
+    // 404/409 — nothing migrated. Flag it so /chat doesn't render an unexplained blank slate.
+    return NextResponse.redirect(`${origin}/chat?intakeIssue=1`)
   }
 
   return NextResponse.redirect(`${origin}${next}`)

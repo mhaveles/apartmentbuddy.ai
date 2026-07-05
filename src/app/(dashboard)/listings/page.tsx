@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { UserListing, Neighborhood, SearchRun } from '@/types'
 import { scoreTier, MIN_DISPLAY_SCORE } from '@/lib/scoring-utils'
 
-export default function ListingsPage() {
+function ListingsContent() {
+  const searchParams = useSearchParams()
+  const hadSearchError = searchParams.get('searchError') === '1'
   const [listings, setListings] = useState<UserListing[]>([])
   const [loading, setLoading] = useState(true)
   const [searching, setSearching] = useState(false)
@@ -342,6 +345,18 @@ export default function ListingsPage() {
         </div>
       </div>
 
+      {hadSearchError && !searching && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800 flex items-center justify-between">
+          <span>We saved your preferences, but couldn&apos;t start your first search automatically.</span>
+          <button
+            onClick={runSearch}
+            className="ml-4 text-xs font-medium text-amber-700 hover:text-amber-900 underline shrink-0"
+          >
+            Retry search
+          </button>
+        </div>
+      )}
+
       {searching && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-sm text-indigo-700 flex items-center justify-between">
           <span>
@@ -616,6 +631,14 @@ export default function ListingsPage() {
         })()}
       </div>
     </div>
+  )
+}
+
+export default function ListingsPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-gray-400">Loading…</div>}>
+      <ListingsContent />
+    </Suspense>
   )
 }
 
