@@ -8,7 +8,7 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
 export default function LandingChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: "Hi! I'm here to learn what you're looking for in an apartment. Where are you looking — what city or neighborhood?" },
+    { role: 'assistant', content: "Hi! I'm ApartmentBuddy. Tell me about the apartment you're looking for:\n\n- Budget (monthly rent)\n- Location (city or neighborhood)\n- Bedrooms / bathrooms\n- Must-haves (parking, in-unit laundry, pets, etc.)\n- Any deal-breakers\n\nFeel free to answer all at once, or just start with what you know." },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
