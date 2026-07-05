@@ -5,7 +5,7 @@ import { Message } from '@/types'
 
 const INITIAL_MESSAGE: Message = {
   role: 'assistant',
-  content: "Hi! I'm ApartmentBuddy. I'm here to help you find an apartment you'll love for years, not just months.\n\nLet's start simple — what city are you looking in, and what's your monthly budget?",
+  content: "Hi! I'm ApartmentBuddy. Let's get your search set up — tell me what you're looking for:\n\n- Budget (monthly rent)\n- Location (city, neighborhood, or ZIP)\n- Bedrooms / bathrooms\n- Must-haves (parking, in-unit laundry, pets, etc.)\n- Any deal-breakers\n\nFeel free to answer all of this in one message — whatever you don't mention yet, I'll ask about.",
   timestamp: new Date().toISOString(),
 }
 
@@ -184,7 +184,7 @@ export default function ChatPage() {
 
       {preferencesExtracted && (
         <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 mb-4 flex items-center justify-between">
-          <span><span className="mr-1">✓</span> Preferences saved! Head to <a href="/neighborhoods" className="font-medium underline">Neighborhoods</a> to start monitoring.</span>
+          <span><span className="mr-1">✓</span> Got your preferences. <a href="/listings" className="font-medium underline">Run your first search</a> to see matching listings.</span>
           <button onClick={startFresh} className="text-xs text-green-600 hover:text-green-800 underline ml-4 shrink-0">Update preferences</button>
         </div>
       )}
