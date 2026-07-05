@@ -191,7 +191,7 @@ function RunSearchButton({ plan, searchesUsed, credits }: { plan: string; search
       <div className="bg-indigo-600 text-white rounded-xl p-5 flex items-center justify-between cursor-pointer hover:bg-indigo-700">
         <div>
           <p className="font-semibold">Run a search</p>
-          <p className="text-sm opacity-75">Scrape and score new listings now</p>
+          <p className="text-sm opacity-75">Find and score new listings now</p>
         </div>
         <span className="text-2xl">→</span>
       </div>

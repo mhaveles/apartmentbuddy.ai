@@ -24,10 +24,10 @@ export default function Home() {
           <span className="text-indigo-600">50 times a day.</span>
         </h1>
         <p className="text-xl text-gray-700 mb-6 max-w-2xl mx-auto font-medium">
-          Now you don&apos;t have to be that person.
+          Now you have a buddy that will do that for you.
         </p>
         <p className="text-lg text-gray-500 mb-10 max-w-2xl mx-auto">
-          ApartmentBuddy watches every new listing across Zillow, Craigslist, and more — then scores each one
+          ApartmentBuddy watches every new listing across Zillow, Craigslist, Trulia, and more — then scores each one
           against what actually matters to you. You only see apartments worth your time.
         </p>
         <a href="#chat" className="inline-block bg-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-indigo-700 shadow-lg shadow-indigo-200">
@@ -49,7 +49,7 @@ export default function Home() {
             {
               step: '02',
               title: 'We scan everything',
-              desc: 'We scrape listings from Zillow, Craigslist, and more — then score every one against your taste.'
+              desc: 'We search Zillow, Craigslist, Trulia, and more — then score every one against your taste.'
             },
             {
               step: '03',
