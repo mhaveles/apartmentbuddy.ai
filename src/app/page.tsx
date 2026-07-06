@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import LandingChat from '@/components/landing/LandingChat'
+import ScrollToChatLink from '@/components/landing/ScrollToChatLink'
 
 export default function Home() {
   return (
@@ -30,9 +31,9 @@ export default function Home() {
           ApartmentBuddy watches every new listing across Zillow, Craigslist, Trulia, and more — then scores each one
           against what actually matters to you. You only see apartments worth your time.
         </p>
-        <a href="#chat" className="inline-block bg-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-indigo-700 shadow-lg shadow-indigo-200">
+        <ScrollToChatLink className="inline-block bg-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-indigo-700 shadow-lg shadow-indigo-200">
           Tell us what you want
-        </a>
+        </ScrollToChatLink>
         <p className="text-sm text-gray-400 mt-4">3 free searches. No credit card required.</p>
       </section>
 

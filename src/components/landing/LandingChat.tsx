@@ -84,12 +84,12 @@ export default function LandingChat() {
 
       <form onSubmit={sendMessage} className="border-t border-gray-100 p-4 flex gap-2">
         <input
+          id="chat-input"
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
           placeholder="Type your answer…"
-          disabled={loading}
-          className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+          className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <button
           type="submit"
