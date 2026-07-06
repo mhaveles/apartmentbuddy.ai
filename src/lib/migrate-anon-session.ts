@@ -20,13 +20,16 @@ export async function migrateAnonSession(
   userId: string,
   sessionId: string
 ): Promise<MigrateAnonSessionResult> {
-  const { data: anonSession } = await service
+  const { data: anonSession, error: selectError } = await service
     .from('anon_sessions')
     .select('id')
     .eq('session_id', sessionId)
     .single()
 
-  if (!anonSession) {
+  if (selectError || !anonSession) {
+    if (selectError && selectError.code !== 'PGRST116') {
+      console.error('anon_sessions lookup failed during migration:', selectError)
+    }
     return { ok: false, status: 404, error: 'Session not found' }
   }
 
