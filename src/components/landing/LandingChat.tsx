@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import SignupModal from './SignupModal'
 import { getAnonSessionId, setAnonSessionId } from '@/lib/anon-session-cookie'
 
@@ -15,9 +15,15 @@ export default function LandingChat() {
   const [error, setError] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [showSignup, setShowSignup] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault()
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages, loading])
+
+  async function sendMessage(e?: React.FormEvent) {
+    e?.preventDefault()
     const trimmed = input.trim()
     if (!trimmed || loading) return
 
@@ -30,6 +36,7 @@ export default function LandingChat() {
 
     setMessages(prev => [...prev, { role: 'user', content: trimmed }])
     setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setLoading(true)
     setError('')
 
@@ -57,8 +64,22 @@ export default function LandingChat() {
     }
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
+  }
+
+  function handleInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setInput(e.target.value)
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`
+  }
+
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm max-w-2xl mx-auto flex flex-col h-[560px]">
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm max-w-2xl mx-auto flex flex-col h-[70vh] max-h-[560px] min-h-[360px]">
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -78,18 +99,21 @@ export default function LandingChat() {
             <div className="bg-gray-100 text-gray-400 rounded-2xl px-4 py-2.5 text-sm">Thinking…</div>
           </div>
         )}
+        <div ref={bottomRef} />
       </div>
 
       {error && <p className="text-red-500 text-sm px-6">{error}</p>}
 
-      <form onSubmit={sendMessage} className="border-t border-gray-100 p-4 flex gap-2">
-        <input
+      <form onSubmit={sendMessage} className="border-t border-gray-100 p-4 flex items-end gap-2">
+        <textarea
           id="chat-input"
-          type="text"
+          ref={textareaRef}
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={handleInput}
+          onKeyDown={handleKeyDown}
+          rows={1}
           placeholder="Type your answer…"
-          className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none overflow-y-auto max-h-32 leading-relaxed"
         />
         <button
           type="submit"
