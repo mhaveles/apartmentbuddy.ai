@@ -15,11 +15,17 @@ export default function LandingChat() {
   const [error, setError] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [showSignup, setShowSignup] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const hasMountedRef = useRef(false)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      return
+    }
+    const container = messagesContainerRef.current
+    if (container) container.scrollTop = container.scrollHeight
   }, [messages, loading])
 
   async function sendMessage(e?: React.FormEvent) {
@@ -80,7 +86,7 @@ export default function LandingChat() {
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl shadow-sm max-w-2xl mx-auto flex flex-col h-[70vh] max-h-[560px] min-h-[360px]">
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
@@ -99,7 +105,6 @@ export default function LandingChat() {
             <div className="bg-gray-100 text-gray-400 rounded-2xl px-4 py-2.5 text-sm">Thinking…</div>
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       {error && <p className="text-red-500 text-sm px-6">{error}</p>}
