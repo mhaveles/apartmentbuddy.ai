@@ -417,6 +417,138 @@ export const blogPosts: BlogPost[] = [
       </>
     ),
   },
+  {
+    slug: 'where-to-actually-live-in-denver',
+    title: 'Where to Actually Live in Denver (Not Just Where Everyone Points You)',
+    description:
+      "RiNo and the Highlands aren't wrong, but they're not the whole story. A neighborhood-by-neighborhood, honest look at where to actually live in Denver, built around the one trade-off that shapes everything else: the mountains.",
+    publishedAt: '2026-07-09',
+    author: 'Sophia',
+    content: (
+      <>
+        <p>
+          If you ask around before moving to Denver, you&rsquo;ll hear the same two neighborhoods over and over: RiNo
+          and the Highlands. They&rsquo;re not wrong, exactly — both are genuinely fun, walkable, full of breweries
+          and good light for photos. They&rsquo;re also the most expensive parts of town, and a lot of the people
+          who move there first don&rsquo;t stay. Prices push them out, or the parts of city life that come with
+          density — including a visible homeless population downtown, in RiNo, and in the Highlands — wear on them
+          after a while. That&rsquo;s not a scare tactic, it&rsquo;s just a fact worth knowing before you sign a
+          lease based on a weekend visit.
+        </p>
+        <p>So here&rsquo;s the version I&rsquo;d actually give a friend.</p>
+
+        <h2>The one thing that changes everything: the mountains</h2>
+        <p>
+          Almost every trade-off in this city comes back to one question — how close do you want to be to the
+          mountains? Denver&rsquo;s whole draw for most transplants is mountain access with a real metro attached:
+          hiking, skiing, biking, all of it, without living in a mountain town. If that&rsquo;s not your thing,
+          that&rsquo;s fine, but be honest with yourself about it, because it shapes where you should live.
+          It&rsquo;s not really either/or — it&rsquo;s a spectrum. Live closer to the mountains and you&rsquo;ll save
+          real hours of commuting on weekends, month after month, year after year. Live closer to downtown and
+          you&rsquo;re buying into more of an alive, urban 20s-to-40s scene — more happening outside your door, less
+          time in the car during the week. Neither is the right answer. It&rsquo;s just a trade-off worth being
+          honest with yourself about.
+        </p>
+
+        <h2>You need a car. Just plan on it.</h2>
+        <p>
+          Outside of a few dense central pockets, Denver runs on cars. The city&rsquo;s improving bus access, but
+          it&rsquo;s not there yet, and the default is still to own one. If your hobbies are in the mountains, add
+          commute time to your hobby time — that&rsquo;s just the math of living here. To its credit, the city&rsquo;s
+          genuinely bike-friendly, and e-bikes and scooters make short trips around the neighborhood easy and
+          honestly kind of fun — but that&rsquo;s a &ldquo;nice to have&rdquo; on top of a car, not a replacement for
+          one, and the convenience costs real money. Most transplants come for the outdoor, active lifestyle, so most
+          people accept the car trade without thinking twice. If that&rsquo;s not you, it&rsquo;s still a fine city,
+          just budget for one either way.
+        </p>
+
+        <h2>The neighborhoods, honestly</h2>
+
+        <h3>RiNo &amp; the Highlands</h3>
+        <p>
+          The popular pick, and popular for a reason: nightlife, restaurants, energy, young professionals with money
+          to spend. It&rsquo;s also the most expensive tier in the city, precisely because it&rsquo;s the one
+          everyone&rsquo;s heard of. Great for a season of life. Fewer people stay here forever than you&rsquo;d
+          guess.
+        </p>
+
+        <h3>Capitol Hill &amp; Congress Park</h3>
+        <p>
+          Older housing stock, a lot of it big early-1900s houses chopped into apartment units, mixed in with actual
+          apartment buildings. Genuinely good parks. More central and generally more affordable than the
+          RiNo/Highlands tier, without losing much walkability.
+        </p>
+
+        <h3>Wash Park</h3>
+        <p>
+          This is where I&rsquo;d point someone looking for real value. Cheaper than Cap Hill, anchored by one of the
+          best parks in the city, full of an active 25–40 crowd. If &ldquo;good park, good price, good energy&rdquo;
+          is your whole checklist, start here.
+        </p>
+
+        <h3>Sloan&rsquo;s Lake</h3>
+        <p>
+          The park here is dominated by the lake itself, so you lose some of the tree cover you&rsquo;d get
+          elsewhere, but you gain a genuinely great walking/biking loop. The commercial strip worth knowing about is
+          Tennyson Street, just north of the lake — that&rsquo;s where the coffee shops, bars, and restaurants
+          actually cluster. Best apartments are the ones close to it.
+        </p>
+
+        <h3>University Park</h3>
+        <p>
+          A major highway cuts this neighborhood off from the Wash Park area, and that divide matters more than the
+          map suggests — it changes the whole feel of getting around. Mostly family homes, quieter, less of a
+          young-professional scene.
+        </p>
+
+        <h3>Arvada</h3>
+        <p>
+          Further out, more house stock than apartments, but genuinely affordable and closer to the mountains than
+          almost anywhere else on this list. Worth considering if proximity to the foothills matters more to you
+          than being in the thick of the city.
+        </p>
+
+        <h3>Aurora</h3>
+        <p>
+          The furthest from the mountains, and the trade-off pays you back in affordability — this is the value pick
+          if mountain access isn&rsquo;t your top priority. It&rsquo;s got real history and an urban-to-suburban
+          range depending on where you land, plus a massive new park currently being built. Worth a look if budget
+          matters more than a foothills view.
+        </p>
+
+        <h2>Two small signals worth caring about</h2>
+        <p>Most guides won&rsquo;t mention either of these, but they tell you a lot:</p>
+        <ul>
+          <li>
+            <strong>Tree coverage.</strong> It varies more by neighborhood than people expect, and it&rsquo;s
+            something the city&rsquo;s actively working to improve. If you&rsquo;ve lived somewhere shaded,
+            you&rsquo;ll notice its absence fast.
+          </li>
+          <li>
+            <strong>Bike infrastructure.</strong> How seriously a neighborhood invests in bike lanes and
+            e-bike-friendly streets is a decent proxy for how much the local government prioritizes actual humans
+            over just cars. It&rsquo;s a small thing that says a lot.
+          </li>
+        </ul>
+
+        <h2>The honest bottom line</h2>
+        <p>
+          There&rsquo;s no single &ldquo;best&rdquo; neighborhood in Denver — there&rsquo;s the one that matches what
+          you actually want, and that&rsquo;s different for everyone. Someone chasing value and mountain access might
+          land in Arvada. Someone who wants a park-centered, active daily life might land in Wash Park. Someone who
+          wants to be in the middle of everything, at a price, lands in RiNo.
+        </p>
+        <p>
+          That&rsquo;s exactly the kind of decision our scoring is built for. The more specific you can be — price,
+          distance to the mountains, how much tree cover matters to you, whether you need a car-free life or
+          you&rsquo;re fine driving — the better we can point you at the right block, not just the popular one.
+        </p>
+        <p>
+          <a href="/#chat">Start your Denver search →</a>
+        </p>
+      </>
+    ),
+  },
 ]
 
 export function getBlogPost(slug: string): BlogPost | undefined {
