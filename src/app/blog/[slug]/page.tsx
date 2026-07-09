@@ -47,7 +47,10 @@ export default async function BlogPostPage({
         [&_strong]:font-semibold [&_strong]:text-gray-900"
     >
       <h1 className="text-4xl font-bold text-gray-900 mb-2 leading-tight">{post.title}</h1>
-      <p className="text-sm text-gray-400 mb-10">{post.publishedAt}</p>
+      <p className="text-sm text-gray-400 mb-10">
+        {post.publishedAt}
+        {post.author ? ` · By ${post.author}` : ''}
+      </p>
       {post.content}
     </article>
   )
