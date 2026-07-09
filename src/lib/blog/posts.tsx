@@ -280,6 +280,143 @@ export const blogPosts: BlogPost[] = [
       </>
     ),
   },
+  {
+    slug: 'moving-somewhere-youve-never-been-how-to-prepare',
+    title: "Moving Somewhere You've Never Been: How to Actually Prepare",
+    description:
+      "Preparing for a city you've never lived in comes down to one split: gather the facts that translate from a screen, and get the rest from people who actually live there.",
+    publishedAt: '2026-07-09',
+    author: 'Jordan',
+    content: (
+      <>
+        <p>
+          Preparing for a city you&rsquo;ve never lived in comes down to one split: gather the facts that translate
+          from a screen, and get the rest from people who actually live there. Price per square foot, commute times,
+          walk scores, you can pull those from a laptop. What a block feels like at 9pm on a Tuesday, you can&rsquo;t.
+        </p>
+        <p>
+          This is different from picking a neighborhood in a city you already know. You&rsquo;re not choosing
+          between two places you can picture. You&rsquo;re choosing based on photos, forum posts, and a map
+          you&rsquo;ve stared at more than you&rsquo;d like to admit. That&rsquo;s a harder problem, and it deserves
+          a different process than &ldquo;just look around.&rdquo;
+        </p>
+
+        <h2>Separate What You Can Research From What You Can&rsquo;t</h2>
+        <p>
+          Some things translate fine from a screen. Commute times, price per square foot, crime stats, walk scores.
+          Pull these first because they&rsquo;re hard to get wrong. A 40-minute commute reads the same on paper
+          whether you&rsquo;re in Denver or Detroit.
+        </p>
+        <p>
+          Other things don&rsquo;t translate at all. What a neighborhood feels like at 9pm on a Tuesday. Whether the
+          &ldquo;up and coming&rdquo; label in a listing means five years out or fifty. Whether the noise from the
+          bar downstairs is charming or exhausting after the third week. These are the things people usually get
+          wrong when they move somewhere new, not because they didn&rsquo;t research, but because some information
+          only exists in person.
+        </p>
+        <p>
+          Know which bucket you&rsquo;re in before you make a decision. If you&rsquo;re treating a feel-based unknown
+          like a fact you already have, that&rsquo;s where the bad surprises come from.
+        </p>
+
+        <h2>Use People Who Live There, Not Just Listings</h2>
+        <p>
+          Local subreddits, city-specific Facebook groups, and even a few cold DMs to people who post about the city
+          will tell you things no listing will. Ask specific questions, not &ldquo;is this a good area.&rdquo; Ask
+          what people specifically complain about. Ask where they&rsquo;d tell a friend not to live, and why. The
+          &ldquo;why&rdquo; is where the useful information lives.
+        </p>
+        <p>
+          If you have any real connection to the city, even a former coworker who moved there two years ago, use it.
+          One 15-minute call from someone with no reason to sell you on the place is worth more than an hour of
+          scrolling listing photos.
+        </p>
+
+        <h2>Decide What You&rsquo;re Actually Optimizing For</h2>
+        <p>
+          Some people are optimizing for speed because speed is genuinely what matters most right now, whether
+          it&rsquo;s a job start date, a lease end date, or a school semester. If that&rsquo;s you, don&rsquo;t
+          punish yourself for not doing the six-week deep dive. Pick a reasonable, safe-enough option and plan to
+          move again in a year if it&rsquo;s wrong. That&rsquo;s a real strategy, not a consolation prize, the same
+          logic that applies to picking speed over specificity in any apartment search.
+        </p>
+        <p>
+          With more runway, the calculation changes. You can afford to wait for the right listing instead of the
+          available one. The people with the most regret are usually the ones who had time to be picky and
+          didn&rsquo;t use it, not the ones who had no choice.
+        </p>
+
+        <h2>Know Your Own Non-Negotiables Before You Land</h2>
+        <p>
+          This matters more when you&rsquo;re new to a city, not less. When you already know a place, you can
+          course-correct on the fly because you have context. When you don&rsquo;t, you&rsquo;re making decisions
+          blind, and vague preferences turn into bad ones fast. &ldquo;I want somewhere nice&rdquo; doesn&rsquo;t
+          help you when you can&rsquo;t picture what nice means in a city you&rsquo;ve never lived in. &ldquo;I want
+          a grocery store within a 10-minute walk&rdquo; and &ldquo;I need parking, not just street permits&rdquo;
+          are decisions you can actually act on, because they don&rsquo;t require you to know the city, just
+          yourself.
+        </p>
+        <p>
+          Write these down before you start looking. It&rsquo;s tempting to build your list of priorities from what
+          you&rsquo;re seeing in listings, but that means the listings are choosing your preferences for you instead
+          of the other way around.
+        </p>
+
+        <h2>A Rough Order of Operations</h2>
+        <ol>
+          <li>Nail down the hard constraints first: budget ceiling, commute limits, must-have building features.</li>
+          <li>Research the facts that translate from a screen: price per square foot, transit access, general safety data.</li>
+          <li>Talk to actual residents about the things that don&rsquo;t translate: noise, vibe, day-to-day annoyances.</li>
+          <li>Decide whether you&rsquo;re optimizing for speed or fit, and let that decide how long you spend on step 3.</li>
+          <li>Lock in your non-negotiables in writing before you start seriously looking at units.</li>
+        </ol>
+
+        <h2>FAQ</h2>
+        <h3>How do I find a good neighborhood in a city I&rsquo;ve never visited?</h3>
+        <p>
+          Split your research into facts that translate from a screen, like commute times and price per square foot,
+          and things that only make sense in person, like noise and neighborhood feel. Get the facts online, then
+          ask people who actually live there about the rest.
+        </p>
+
+        <h3>Is it a bad idea to move somewhere sight unseen?</h3>
+        <p>
+          Not necessarily. It&rsquo;s a real constraint for a lot of relocations, especially on a tight timeline. The
+          risk isn&rsquo;t moving sight unseen, it&rsquo;s moving without doing the research that doesn&rsquo;t
+          require seeing it in person.
+        </p>
+
+        <h3>How far in advance should I start researching a new city before moving?</h3>
+        <p>
+          As early as your timeline allows. Facts and data take almost no lead time to gather. Talking to real
+          residents and getting honest answers takes longer, so start that part first if you can.
+        </p>
+
+        <h3>What should I ask people who already live in the city I&rsquo;m moving to?</h3>
+        <p>
+          Ask what they&rsquo;d tell a friend not to do, not just what they&rsquo;d recommend. Specific complaints
+          are more useful than general praise because they tell you what to watch for.
+        </p>
+
+        <h3>Should I pick a neighborhood or just pick any apartment and figure it out later?</h3>
+        <p>
+          That depends on what you&rsquo;re optimizing for. If you&rsquo;re on a tight deadline, picking a
+          safe-enough option and reassessing after a year is a legitimate approach. If you have more time,
+          it&rsquo;s usually worth waiting for the right fit.
+        </p>
+
+        <p>
+          You&rsquo;ve only got so much time before you land, and most of it should go to the stuff you can&rsquo;t
+          get from a screen. ApartmentBuddy handles the part that does translate, pulling price, commute, and walk
+          data into ranked results, so the hours you do have go toward finding out what the neighborhood actually
+          feels like.
+        </p>
+        <p>
+          <a href="/#chat">Tell us what you&rsquo;re looking for →</a>
+        </p>
+      </>
+    ),
+  },
 ]
 
 export function getBlogPost(slug: string): BlogPost | undefined {
