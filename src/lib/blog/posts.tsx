@@ -1464,6 +1464,120 @@ export const blogPosts: BlogPost[] = [
       </>
     ),
   },
+  {
+    slug: 'apartment-search-for-incoming-grad-students',
+    title: 'The Apartment Search for Incoming Grad Students',
+    description:
+      "Grad school hands you a start date and expects you settled in, not couch-surfing through orientation. A stipend instead of a salary, an unpredictable schedule, and often a city you've never lived in change how the search should work.",
+    publishedAt: '2026-07-10',
+    author: 'Jordan',
+    content: (
+      <>
+        <p>
+          Grad school hands you an acceptance letter and a start date, and expects you to show up ready to work,
+          already settled in somewhere, rather than couch-surfing through orientation week. The search itself looks
+          different from a typical move: a stipend instead of a salary, a schedule that swings between rigid class
+          times and open-ended research hours, and often a city you&rsquo;ve never actually lived in before the
+          movers show up.
+        </p>
+
+        <h2>Your stipend is real money, budget it like it</h2>
+        <p>
+          A stipend can feel like an amount to just get by on, but treating it that way is how people end up in a
+          worse living situation than their actual budget could support. Price out your full monthly cost first, the
+          whole picture, and you&rsquo;ll often find there&rsquo;s more room to work with than the sticker price on a
+          listing suggests, especially once you&rsquo;re comparing real options against each other instead of taking
+          the first place that seemed affordable.
+        </p>
+        <p>
+          Where a stipend genuinely tightens things is the ceiling itself. It&rsquo;s usually more fixed than a
+          salary, without much room to stretch in a good month. That makes it worth spending deliberately rather than
+          defensively: know what actually matters to you in a living space, and put the budget there instead of
+          spreading it thin across a list of things you assumed you needed.
+        </p>
+
+        <h2>Your schedule doesn&rsquo;t look like a normal workday</h2>
+        <p>
+          Lab hours, teaching sections, research that runs late, office hours that start early, grad school rarely
+          fits into a predictable 9-to-5. A walk or ride that&rsquo;s fine at 8am can feel completely different at
+          11pm after a long night in the lab. Weigh a location against the full range of hours you&rsquo;ll actually
+          be moving through it, and treat a standard commute estimate as a starting point at best.
+        </p>
+        <p>
+          If you don&rsquo;t yet know your exact schedule, and plenty of incoming students don&rsquo;t until
+          orientation, lean toward flexibility over locking in a fixed assumption about your hours.
+        </p>
+
+        <h2>Roommates change the math, but only if you actually want them</h2>
+        <p>
+          Splitting rent with roommates is a common way grad students stretch a stipend further, and it&rsquo;s a
+          legitimate strategy in its own right, the same way any deliberate trade-off in a search is, rather than a
+          consolation prize for people who couldn&rsquo;t afford better. Living alone on a tighter budget is an
+          equally legitimate choice, if quiet and control over your own space matters enough to you to prioritize it.
+          The math works out fine either way. What matters is picking the option that fits how you actually want to
+          live.
+        </p>
+
+        <h2>You&rsquo;re moving somewhere you&rsquo;ve probably never lived</h2>
+        <p>
+          A lot of grad programs pull students from somewhere else entirely, which means the research that
+          doesn&rsquo;t require being there in person is worth doing before you land: commute patterns near campus,
+          which neighborhoods actually cater to students versus just being close on a map, what a walk home looks
+          like after dark if you&rsquo;re going to be on campus late. All of it is easy to skip and expensive to get
+          wrong.
+        </p>
+
+        <h2>The deadline is real, and so is the value of doing this right</h2>
+        <p>
+          Move-in dates tied to an academic calendar don&rsquo;t flex much. That&rsquo;s a real constraint, and
+          it&rsquo;s a completely legitimate reason to prioritize a faster search over an exhaustive one. It
+          doesn&rsquo;t mean lowering your standards, it means being clear on your specific priorities early so you
+          can move quickly toward the right place instead of settling for whatever&rsquo;s simply available.
+        </p>
+
+        <h2>FAQ</h2>
+        <h3>How should grad students budget for an apartment on a stipend?</h3>
+        <p>
+          Price out your full monthly cost, not just rent, and treat your stipend as a fixed ceiling to spend
+          deliberately rather than a number to just get under. There&rsquo;s often more usable budget than the listed
+          rent suggests once you compare real options.
+        </p>
+
+        <h3>Is it better for grad students to live alone or with roommates?</h3>
+        <p>
+          Both are legitimate choices. Roommates stretch a stipend further, but living alone is a reasonable priority
+          if quiet and control over your space matter enough to you. Neither option is more responsible than the
+          other.
+        </p>
+
+        <h3>How far in advance should grad students start apartment hunting for a new city?</h3>
+        <p>
+          As early as your program&rsquo;s timeline allows, especially if you&rsquo;re moving somewhere you&rsquo;ve
+          never lived. Researching commute patterns and neighborhoods ahead of time doesn&rsquo;t require an
+          in-person visit.
+        </p>
+
+        <h3>What should grad students prioritize if their schedule isn&rsquo;t fixed yet?</h3>
+        <p>
+          Lean toward flexibility, both in lease terms and in how you evaluate commute, since research hours,
+          teaching schedules, and lab time can shift once the semester actually starts.
+        </p>
+
+        <h3>Should grad students settle for the first apartment they can afford?</h3>
+        <p>
+          No. A tight timeline is a real reason to move quickly, but speed and having clear priorities aren&rsquo;t
+          opposites. Knowing exactly what you need lets you move fast toward the right place.
+        </p>
+
+        <p>
+          Getting into your program took clear priorities and real work. Apartment hunting rewards the same approach.
+          Run your stipend through ApartmentBuddy and it&rsquo;ll surface the places that actually fit, the ones
+          worth building a semester around.
+        </p>
+        <CtaButton href="/#chat">Start a search →</CtaButton>
+      </>
+    ),
+  },
 ]
 
 export function getBlogPost(slug: string): BlogPost | undefined {
