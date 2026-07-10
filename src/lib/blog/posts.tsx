@@ -1343,6 +1343,127 @@ export const blogPosts: BlogPost[] = [
       </>
     ),
   },
+  {
+    slug: 'apartment-search-for-residents-starting-a-new-program',
+    title: 'The Apartment Search for Residents Starting a New Program',
+    description:
+      "Residency runs on a schedule that isn't yours to control. Shift work, overnight call, and daytime sleep mean the apartment search needs a different set of priorities, built around recovery and function first.",
+    publishedAt: '2026-07-10',
+    author: 'Jordan',
+    content: (
+      <>
+        <p>
+          Residency puts you in a new city on a schedule that isn&rsquo;t yours to control. Shift work, overnight
+          call, and stretches where you&rsquo;re barely home mean the apartment search needs a different set of
+          priorities than a typical move, ones built around recovery and function first.
+        </p>
+
+        <h2>Your schedule is the real constraint</h2>
+        <p>
+          A commute time on a map doesn&rsquo;t account for what the drive actually costs you after a 24-hour shift.
+          Distance matters, but so does the realistic condition you&rsquo;ll be driving in: exhausted, at odd hours,
+          possibly running on minimal sleep. A 15-minute drive at a normal hour can turn into a genuinely different,
+          riskier drive at 6am after a night shift. Weigh commute against the day you&rsquo;ll actually be having, not
+          the version a maps app shows you at noon.
+        </p>
+        <p>
+          If you have any flexibility between two similar units, the one that shortens your worst-case commute, the
+          drive home after the hardest shift, is usually worth more than the one that&rsquo;s marginally cheaper or
+          slightly nicer.
+        </p>
+
+        <h2>Sleep is the priority most apartment searches skip</h2>
+        <p>
+          Rotating shifts mean you&rsquo;ll be sleeping during daylight hours on a regular basis, and a unit that
+          wasn&rsquo;t built with that in mind can quietly undermine your recovery for the length of your program. A
+          few things worth weighing seriously here:
+        </p>
+        <ul>
+          <li>
+            <strong>Light control.</strong> North-facing units or ones without direct morning sun exposure make
+            daytime sleep considerably easier. Blackout curtains help, but they can&rsquo;t fully compensate for a
+            unit that floods with light all day.
+          </li>
+          <li>
+            <strong>Noise.</strong> Street noise, neighbors, thin walls, all of it matters more when you&rsquo;re
+            sleeping at 10am than 10pm. A quieter building or a unit further from a busy street is worth prioritizing
+            over square footage or amenities you won&rsquo;t have time to use anyway.
+          </li>
+          <li>
+            <strong>Distance from anything loud on a predictable schedule.</strong> Bars, event venues, anything with
+            regular late-night or early-morning noise is worth avoiding even if the price looks good.
+          </li>
+        </ul>
+        <p>Take these seriously up front. They&rsquo;re protecting the one resource residency depends on most.</p>
+
+        <h2>Get it right the first time</h2>
+        <p>
+          Residents don&rsquo;t usually move mid-program. Once you&rsquo;re in, the cost of moving again, in time,
+          energy, and everything else residency is already asking of you, means most residents find a place and
+          settle in for the duration. That changes the calculation. Instead of optimizing for flexibility, optimize
+          for accuracy the way you would for any hard, known constraint: a longer lease isn&rsquo;t a risk here,
+          it&rsquo;s a strength, since a longer term often comes with a better rate and the security of settling the
+          question once.
+        </p>
+        <p>
+          The tradeoff is real pressure to get the choice right the first time, since a redo mid-program is rarely on
+          the table. Give the light, noise, and commute priorities above the weight they deserve before you sign.
+          There won&rsquo;t be much appetite to solve them later.
+        </p>
+
+        <h2>Furnished can be worth the premium</h2>
+        <p>
+          Furnishing an apartment from scratch during an already demanding transition is a real cost, in money and in
+          the kind of time you won&rsquo;t have much of. A furnished unit at a higher monthly rate can end up cheaper
+          overall once you account for furniture, delivery, and the hours spent assembling a place you&rsquo;ll be too
+          exhausted to enjoy putting together. Run the actual comparison rather than assuming unfurnished wins by
+          default.
+        </p>
+
+        <h2>FAQ</h2>
+        <h3>What should residents prioritize when apartment hunting?</h3>
+        <p>
+          Noise and light control for daytime sleep, a commute that holds up under realistic post-shift conditions,
+          and getting the choice right the first time since most residents settle in for the full program rather than
+          moving again.
+        </p>
+
+        <h3>How should I think about commute distance as a resident?</h3>
+        <p>
+          Weigh it against your actual shift schedule and worst-case conditions, driving exhausted after a night
+          shift, rather than average daytime traffic. A slightly longer commute at a normal hour can be safer and
+          easier than a shorter one under those conditions.
+        </p>
+
+        <h3>Is it worth paying more for a furnished apartment during residency?</h3>
+        <p>
+          Often, yes. Once you account for the cost and time of furnishing an apartment from scratch during a
+          demanding transition, a furnished unit&rsquo;s higher rent can be the better overall value.
+        </p>
+
+        <h3>Should residents sign long-term leases?</h3>
+        <p>
+          Usually, yes. Since most residents settle into one place for the full length of their program rather than
+          moving mid-residency, a longer lease is typically a strength, often with a better rate, rather than a risk.
+        </p>
+
+        <h3>How much does noise and light matter in choosing a unit?</h3>
+        <p>
+          More than most apartment searches account for. Sleeping during daylight hours on a rotating basis makes
+          light control and quiet meaningfully more important than they&rsquo;d be on a standard schedule.
+        </p>
+
+        <p>
+          You&rsquo;re going to get through this program no matter what apartment you land in. That&rsquo;s the part
+          that isn&rsquo;t in question. What&rsquo;s still open is whether the place you come home to makes the hard
+          stretches a little easier, or adds to them. ApartmentBuddy scores listings against what actually matters
+          for a rotation like yours, commute at the hours you&rsquo;re really driving, quiet for the sleep
+          you&rsquo;re actually getting, a place worth settling into for the whole program.
+        </p>
+        <CtaButton href="/#chat">Start a search →</CtaButton>
+      </>
+    ),
+  },
 ]
 
 export function getBlogPost(slug: string): BlogPost | undefined {
