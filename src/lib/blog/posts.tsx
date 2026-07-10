@@ -1026,6 +1026,201 @@ export const blogPosts: BlogPost[] = [
       </>
     ),
   },
+  {
+    slug: 'the-apartment-hunting-checklist-nobody-gives-you',
+    title: 'The Apartment-Hunting Checklist Nobody Gives You',
+    description:
+      'Most apartment checklists tell you what to look for. Fewer tell you what to have ready, the paperwork, the questions, the logistics, that quietly decide whether you get the place you want.',
+    publishedAt: '2026-07-10',
+    author: 'Jordan',
+    content: (
+      <>
+        <p>
+          Most apartment checklists tell you what to look for. Fewer tell you what to have ready, the paperwork, the
+          questions, the logistics, that quietly decide whether you get the place you want or watch it go to someone
+          who applied faster. There&rsquo;s no universal version of this list that fits everyone exactly the same
+          way, but there&rsquo;s a core of it that applies no matter what you&rsquo;re prioritizing in your search.
+        </p>
+
+        <h2>Paperwork That Speeds Everything Up</h2>
+        <p>
+          The apartments worth having move fast. Most applications ask for the same handful of documents, and having
+          them ready before you find a place you want means you can move on it the moment it appears instead of
+          scrambling while someone else applies first.
+        </p>
+        <ul>
+          <li>
+            <strong>Proof of income.</strong> Pay stubs, an offer letter, or bank statements, depending on your
+            situation. If your income is nontraditional, freelance, a new job that hasn&rsquo;t started yet, figure
+            out in advance what you&rsquo;ll use to document it. This is where applications commonly stall, and
+            it&rsquo;s worth solving before you&rsquo;re under time pressure.
+          </li>
+          <li>
+            <strong>Credit report awareness.</strong> Know your credit standing before you apply. If it&rsquo;s a
+            concern, some landlords accept a larger deposit or a co-signer, but that&rsquo;s a much easier
+            conversation to have upfront than mid-application.
+          </li>
+          <li>
+            <strong>References.</strong> A previous landlord reference, plus personal or professional references if
+            requested. Line these up ahead of time so you&rsquo;re not chasing someone down while a lease is on the
+            table.
+          </li>
+          <li>
+            <strong>Photo ID and Social Security number.</strong> Standard for a background check, but easy to forget
+            to have on hand when you&rsquo;re filling out an application in a hurry.
+          </li>
+        </ul>
+
+        <h2>Costs to Have in Cash, Not Just in the Budget</h2>
+        <p>
+          There&rsquo;s a real difference between having a cost accounted for in your monthly budget and having the
+          actual money for it on move-in day. A few things tend to come due upfront, all at once, and catch people
+          off guard even when they&rsquo;d technically planned for them:
+        </p>
+        <ul>
+          <li>
+            <strong>Security deposit.</strong> Often equivalent to one month&rsquo;s rent, though this varies by
+            building and by your application strength. Ask early so it&rsquo;s not a surprise at signing.
+          </li>
+          <li>
+            <strong>First and sometimes last month&rsquo;s rent.</strong> Some leases require both up front. Confirm
+            this at the outset of the process.
+          </li>
+          <li>
+            <strong>Application fees.</strong> Small individually, but they add up if you&rsquo;re applying to
+            multiple places, and they don&rsquo;t come back regardless of outcome.
+          </li>
+          <li>
+            <strong>Move-in fees.</strong> Separate from the deposit in many buildings, sometimes covering elevator
+            reservations, building access setup, or administrative costs.
+          </li>
+        </ul>
+        <p>
+          Add these up before you start applying. Knowing the real number in advance is what turns a move-in into a
+          plan instead of a scramble.
+        </p>
+
+        <h2>Questions Worth Asking During the Process</h2>
+        <p>
+          What matters most here depends a lot on what you&rsquo;re actually optimizing for. Someone prioritizing
+          flexibility is going to care more about the lease-break policy. Someone who&rsquo;s picky about their space
+          is going to care more about maintenance turnaround. Both are legitimate things to weigh differently, so
+          read this list with your own priorities in mind, not as a uniform must-ask-all-of-these script.
+        </p>
+        <ul>
+          <li>
+            <strong>What&rsquo;s included in rent, and what isn&rsquo;t?</strong> Utilities, parking, and amenities
+            vary widely between buildings that look similar on paper. Get this in writing.
+          </li>
+          <li>
+            <strong>What&rsquo;s the policy on breaking the lease early?</strong> Life changes. Knowing the penalty
+            structure ahead of signing means you&rsquo;re never finding out under pressure.
+          </li>
+          <li>
+            <strong>How are maintenance requests handled, and how fast?</strong> This matters more than it seems
+            like it will until something breaks.
+          </li>
+          <li>
+            <strong>Is renters insurance required?</strong> Many leases require it. If so, it&rsquo;s a real monthly
+            cost, not an optional extra, so it belongs in your budget from the start.
+          </li>
+        </ul>
+
+        <h2>Move-In Logistics to Line Up Early</h2>
+        <p>
+          The practical side doesn&rsquo;t end at signing. A few things worth confirming ahead of your move-in date
+          so they&rsquo;re settled, not scrambled:
+        </p>
+        <ul>
+          <li>
+            <strong>Utility setup timing.</strong> Some utilities take days to activate, so start this as soon as you
+            have a move-in date.
+          </li>
+          <li>
+            <strong>Renter&rsquo;s insurance start date.</strong> If required, line up coverage to begin on or before
+            you get your keys.
+          </li>
+          <li>
+            <strong>Move-in inspection documentation.</strong> Photograph the unit&rsquo;s condition on day one. This
+            is what protects your deposit later, and it costs nothing but a few minutes.
+          </li>
+          <li>
+            <strong>Address change logistics.</strong> Mail forwarding, ID updates, and account address changes are
+            easy to forget and mildly annoying to fix late.
+          </li>
+        </ul>
+
+        <h2>Speed Versus Thoroughness Is a Real Trade-Off</h2>
+        <p>
+          If you&rsquo;re on a tight deadline, you may not have time to line up every item on this list perfectly
+          before you apply, and that&rsquo;s a legitimate strategy in its own right when speed is genuinely what the
+          situation calls for. In that case, prioritize the paperwork that speeds up approval, proof of income,
+          references, since that&rsquo;s what actually determines whether you get the place. The move-in logistics
+          can be handled in the days right after signing.
+        </p>
+        <p>
+          If you have more runway, working through the full list before you&rsquo;re deep in the search means fewer
+          surprises and more room to actually evaluate the questions that matter, instead of answering them under
+          pressure at a signing table.
+        </p>
+
+        <h2>A Simple Pre-Application Checklist</h2>
+        <ol>
+          <li>Confirm your total upfront cost: deposit, first month, last month if required, application fees.</li>
+          <li>Have proof of income and references ready before you find a place you want.</li>
+          <li>Know your credit standing and have a plan if it&rsquo;s a factor.</li>
+          <li>Ask what&rsquo;s included in rent, in writing.</li>
+          <li>Confirm the lease-break policy and renters insurance requirement ahead of signing.</li>
+          <li>
+            Photograph the unit&rsquo;s move-in condition and start utility setup as soon as your move-in date is
+            set.
+          </li>
+        </ol>
+
+        <h2>FAQ</h2>
+        <h3>What documents do I need to apply for an apartment?</h3>
+        <p>
+          Typically proof of income, a photo ID, Social Security number, and references, including a previous
+          landlord if you have one. Requirements vary by building, so confirm in advance.
+        </p>
+
+        <h3>How much money should I have ready before applying to apartments?</h3>
+        <p>
+          Enough to cover a security deposit, often around one month&rsquo;s rent, plus potentially first and last
+          month&rsquo;s rent and nonrefundable application fees. The exact total varies by building and by your
+          application strength.
+        </p>
+
+        <h3>What should I ask a landlord before signing a lease?</h3>
+        <p>
+          What&rsquo;s included in rent, the policy for breaking the lease early, how maintenance requests are
+          handled, and whether renters insurance is required. Which of these matters most to you depends on what
+          you&rsquo;re prioritizing in the search.
+        </p>
+
+        <h3>Is renters insurance required to rent an apartment?</h3>
+        <p>
+          It depends on the building. Many require it as a lease condition, in which case it&rsquo;s a real, ongoing
+          cost that belongs in your monthly budget from the start.
+        </p>
+
+        <h3>What should I do on move-in day to protect my deposit?</h3>
+        <p>
+          Photograph the unit&rsquo;s condition thoroughly before moving your belongings in. This documentation is
+          what protects you if there&rsquo;s a dispute over the deposit when you move out.
+        </p>
+
+        <p>
+          The checklist that actually matters is the one that keeps a good apartment from slipping away over a
+          missing document or a cost you didn&rsquo;t plan for. ApartmentBuddy surfaces the listings worth applying
+          for, so the paperwork is the only thing left to race.
+        </p>
+        <p>
+          <a href="/#chat">Start your search →</a>
+        </p>
+      </>
+    ),
+  },
 ]
 
 export function getBlogPost(slug: string): BlogPost | undefined {
