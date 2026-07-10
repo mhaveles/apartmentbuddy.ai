@@ -1206,6 +1206,143 @@ export const blogPosts: BlogPost[] = [
       </>
     ),
   },
+  {
+    slug: 'hidden-costs-that-wreck-apartment-budgets',
+    title: 'Hidden Costs That Wreck Apartment Budgets',
+    description:
+      "The rent on a listing is a starting number, not a final one. Pet fees, utilities, application fees, and moving costs all stack on top, and most of them don't show up until you're deep in the process.",
+    publishedAt: '2026-07-10',
+    author: 'Carol',
+    content: (
+      <>
+        <p>
+          The rent on a listing is a starting number, not a final one. Pet fees, utilities, application fees, and the
+          cost of actually getting yourself and your stuff into the unit all stack on top, and most of them
+          don&rsquo;t show up clearly until you&rsquo;re deep in the process. A budget that only accounts for rent
+          isn&rsquo;t a real budget, it&rsquo;s a guess with a decimal point.
+        </p>
+
+        <h2>Pet fees are rarely just one fee</h2>
+        <p>
+          If you have a pet, expect more than a single line item. Buildings commonly charge some combination of a
+          one-time pet deposit, a nonrefundable pet fee, and a recurring monthly pet rent on top of your regular rent.
+          These vary a lot building to building, even within the same city, and they&rsquo;re not always disclosed
+          clearly upfront. Ask for the full pet cost breakdown on every listing you&rsquo;re seriously considering,
+          since the gap between a building with a modest one-time fee and one stacking a deposit, a fee, and monthly
+          rent can be the difference between an affordable apartment and one that quietly isn&rsquo;t.
+        </p>
+
+        <h2>Utilities are the most underestimated line item</h2>
+        <p>
+          &ldquo;Utilities not included&rdquo; reads like a minor caveat on a listing. In practice, it can be one of
+          the largest hidden costs in the whole budget, and it varies enormously depending on the building&rsquo;s
+          age, insulation, and which utilities are actually excluded. Heat, electric, water, gas, trash, internet,
+          some combination of these is often on you, and older or poorly insulated units can run meaningfully higher
+          than newer ones even at the same square footage.
+        </p>
+        <p>
+          Ask specifically which utilities are included, and if possible, ask the current or previous tenant what
+          they actually paid. A listing&rsquo;s silence on utilities isn&rsquo;t the same as utilities being cheap.
+        </p>
+
+        <h2>Application fees, and the other costs that add up fast</h2>
+        <p>
+          A single application fee feels minor, until it&rsquo;s attached to every place you apply to in a
+          competitive market. It&rsquo;s a nonrefundable cost regardless of outcome, and it&rsquo;s worth tracking as
+          real spending during your search rather than dismissing each one individually.
+        </p>
+
+        <h2>Moving costs live outside the lease entirely, and still hit your budget</h2>
+        <p>
+          None of this is in your lease, but all of it comes out of the same bank account. A truck rental or moving
+          company, gas or mileage if you&rsquo;re driving a load yourself, boxes and packing materials, time off work
+          if your move can&rsquo;t happen on a weekend, these are real costs that a rent-and-fees budget quietly
+          ignores because they&rsquo;re not technically part of the apartment transaction. They still need a line
+          item.
+        </p>
+        <p>
+          The scale of this cost depends heavily on distance and how much you&rsquo;re moving, which makes it a bad
+          candidate for a universal number, but a good candidate for pricing out yourself before moving day, not the
+          week of.
+        </p>
+
+        <h2>Other line items worth pricing out</h2>
+        <p>A few more costs that regularly surprise renters:</p>
+        <ul>
+          <li>
+            <strong>Move-in and administrative fees.</strong> Separate from the security deposit, sometimes covering
+            elevator reservations or building access setup.
+          </li>
+          <li>
+            <strong>Parking.</strong> Rarely included by default. Confirm whether it&rsquo;s free, included, or a
+            separate monthly charge, and get the actual number if it&rsquo;s separate.
+          </li>
+          <li>
+            <strong>Renters insurance.</strong> Required by many leases. A small monthly cost, but a real, recurring
+            one worth budgeting for from the start.
+          </li>
+          <li>
+            <strong>Amenity fees.</strong> Some buildings charge separately for a gym, pool, or package service, on
+            top of rent, whether you use them or not.
+          </li>
+        </ul>
+        <p>
+          None of these are dealbreakers on their own. Stacked together and discovered late, they&rsquo;re what turns
+          a budget that looked fine on paper into one that doesn&rsquo;t hold up in practice.
+        </p>
+
+        <h2>How to actually price out a listing before committing</h2>
+        <ol>
+          <li>Start with the listed rent as your baseline, not your final number.</li>
+          <li>Ask directly about pet fees, both one-time and monthly, if you have a pet.</li>
+          <li>Confirm exactly which utilities are included, and get a real number if you can.</li>
+          <li>Track application fees as real spending across every place you apply to.</li>
+          <li>Price out moving costs separately, since they&rsquo;re real but sit outside the lease entirely.</li>
+          <li>Ask about parking, renters insurance requirements, and any recurring amenity fees before signing.</li>
+        </ol>
+        <p>Running this list on a listing is the difference between a rent number and an actual monthly cost.</p>
+
+        <h2>FAQ</h2>
+        <h3>What hidden fees should I watch for when renting with a pet?</h3>
+        <p>
+          Ask about a one-time pet deposit, a nonrefundable pet fee, and monthly pet rent separately, since buildings
+          often charge some combination of all three and rarely disclose the full total upfront.
+        </p>
+
+        <h3>How much do utilities typically add to rent?</h3>
+        <p>
+          It varies significantly by building age, insulation, and which utilities are excluded, so there&rsquo;s no
+          universal number. Ask the leasing office directly, and ask a current or previous tenant what they actually
+          paid if possible.
+        </p>
+
+        <h3>Are application fees refundable?</h3>
+        <p>
+          No, application fees are typically nonrefundable regardless of whether you&rsquo;re approved. Applying to
+          multiple places means those costs add up as real spending, not just a formality.
+        </p>
+
+        <h3>Does moving cost factor into an apartment budget?</h3>
+        <p>
+          Yes, even though it&rsquo;s not part of the lease. Truck rental or movers, gas or mileage, packing
+          materials, and lost work time are all real costs tied to a move and worth pricing out ahead of time.
+        </p>
+
+        <h3>Is renters insurance actually required?</h3>
+        <p>
+          Often, yes. Many leases require it as a condition of signing, which makes it a real, recurring cost that
+          belongs in budget planning from the start.
+        </p>
+
+        <p>
+          A rent number by itself is never the real cost of an apartment. ApartmentBuddy scores every listing against
+          your full picture, not just the headline rent, so the real monthly cost shows up before you apply, not
+          after.
+        </p>
+        <CtaButton href="/#chat">Start a search and see what&rsquo;s hiding in the listings →</CtaButton>
+      </>
+    ),
+  },
 ]
 
 export function getBlogPost(slug: string): BlogPost | undefined {
