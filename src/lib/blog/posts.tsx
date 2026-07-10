@@ -1466,7 +1466,7 @@ export const blogPosts: BlogPost[] = [
   },
   {
     slug: 'apartment-search-for-incoming-grad-students',
-    title: 'The Apartment Search for Incoming Grad Students',
+    title: 'An Apartment Search Guide for Incoming Grad Students',
     description:
       "Grad school hands you a start date and expects you settled in, not couch-surfing through orientation. A stipend instead of a salary, an unpredictable schedule, and often a city you've never lived in change how the search should work.",
     publishedAt: '2026-07-10',
