@@ -685,6 +685,178 @@ export const blogPosts: BlogPost[] = [
       </>
     ),
   },
+  {
+    slug: 'how-to-find-a-great-apartment-on-a-budget',
+    title: "How to Find a Great Apartment on a Budget, Wherever You're Moving",
+    description:
+      "A great apartment on a budget isn't about finding the cheapest listing, it's about knowing where your money is actually going so it goes toward what matters to you.",
+    publishedAt: '2026-07-09',
+    author: 'Carol',
+    content: (
+      <>
+        <p>
+          A great apartment on a budget isn&rsquo;t about finding the cheapest listing, it&rsquo;s about knowing
+          where your money is actually going so it goes toward what matters to you. That&rsquo;s true whether
+          you&rsquo;ve got a steady paycheck and a clear number in mind, or you&rsquo;re mid-transition, new job, new
+          city, income that&rsquo;s still settling, and don&rsquo;t have a clean budget figured out yet. Both are
+          normal starting points. This is about building a workable number from wherever you&rsquo;re standing, not
+          hitting a target you&rsquo;re supposed to already have.
+        </p>
+
+        <h2>Figure out what you can actually spend</h2>
+        <p>
+          If you already know your take-home pay, a common starting reference is keeping rent under roughly 30% of
+          it, though that number flexes a lot depending on your other costs, so treat it as a loose anchor, not a
+          rule. If you don&rsquo;t have a steady income yet, or you&rsquo;re working with savings, a signing bonus,
+          or a new job that hasn&rsquo;t hit your account, work backward instead: figure out what you can comfortably
+          commit to for the length of the lease, factoring in a cushion for the unpredictable first few months in a
+          new place.
+        </p>
+        <p>
+          Either way, the goal is the same: land on a number that&rsquo;s yours, based on your real situation, not a
+          percentage that assumes a life you may not currently have.
+        </p>
+
+        <h2>Total cost, not sticker price</h2>
+        <p>Rent is one line item, not the whole budget. Before comparing two apartments, price out:</p>
+        <ul>
+          <li>
+            <strong>Utilities.</strong> Some listings include heat, water, or trash. Others include nothing. A
+            $200/month utility gap between two similarly priced units is a real difference, worth factoring in.
+          </li>
+          <li>
+            <strong>Parking.</strong> Free, included, or a separate monthly fee. Ask directly, don&rsquo;t assume.
+          </li>
+          <li>
+            <strong>Deposits and move-in fees.</strong> These hit your bank account once, but they still need to be
+            budgeted for, especially if you&rsquo;re also covering movers or a truck rental in the same month.
+          </li>
+          <li>
+            <strong>Commute cost.</strong> A cheaper apartment further from work isn&rsquo;t automatically the better
+            deal once you add gas, transit passes, or the extra hours you&rsquo;re trading for the discount.
+          </li>
+        </ul>
+        <p>
+          Add these up before comparing prices across listings. The apartment with the lower rent isn&rsquo;t always
+          the apartment with the lower monthly cost.
+        </p>
+
+        <h2>Spend on what actually affects your day, not what looks good in photos</h2>
+        <p>
+          Not all square footage and finishes deliver equal value. The things that tend to actually affect quality of
+          life, good light, a manageable commute, some control over noise, access to outdoor space, are worth paying
+          for.
+        </p>
+        <p>
+          The flip side takes some honesty. Be real with yourself about which amenities genuinely get you excited and
+          which ones you&rsquo;re paying for out of habit or because a listing made them sound appealing. A gym
+          membership you&rsquo;ve never used before isn&rsquo;t likely to get used just because it&rsquo;s downstairs.
+          Knowing that about yourself, honestly, is worth more than any amenity list.
+        </p>
+        <p>
+          Before you search, rank what you actually care about, and let that ranking, not the listing photos, decide
+          where your money goes.
+        </p>
+
+        <h2>Costs that are easy to miss</h2>
+        <p>
+          A few line items that are simple to overlook, not because anyone&rsquo;s careless, but because
+          they&rsquo;re not always front and center on a listing:
+        </p>
+        <ul>
+          <li>
+            <strong>Included amenities you won&rsquo;t use.</strong> Building fees fund the pool and the gym whether
+            you touch them or not, worth knowing before you pay a premium for a building that has them.
+          </li>
+          <li>
+            <strong>Utility variance.</strong> Older buildings and units with less insulation can run utility costs
+            meaningfully higher than newer, better-sealed ones, even at the same square footage.
+          </li>
+          <li>
+            <strong>Lease-length pricing.</strong> Shorter leases often carry a premium. If you&rsquo;re staying a
+            year or more, a longer lease can lower your effective monthly rate. It&rsquo;s also worth just asking.
+            Buildings sometimes run promos in slower leasing months, off-peak season, holidays, and pricing that
+            isn&rsquo;t listed publicly. A quick question to the leasing office can turn up a discount you&rsquo;d
+            never see in the listing.
+          </li>
+          <li>
+            <strong>Application fees.</strong> Applying to five apartments at $50 each adds up fast if you&rsquo;re
+            not tracking it as real spending.
+          </li>
+        </ul>
+        <p>Worth knowing, not worth stressing over. A little awareness here goes a long way.</p>
+
+        <h2>Build a budget that&rsquo;s actually yours</h2>
+        <ol>
+          <li>
+            Land on a rent ceiling based on your real situation, income, savings, or a mix of both, not a generic
+            percentage.
+          </li>
+          <li>
+            Price out full monthly cost for any listing you&rsquo;re seriously considering: rent, utilities, parking,
+            commute.
+          </li>
+          <li>
+            Rank what you actually want out of a living space before you start comparing options, and let that
+            ranking guide decisions instead of vague, &ldquo;I&rsquo;ll know it when I see it&rdquo; instincts.
+          </li>
+          <li>Spend toward that ranking, not toward square footage or amenities you won&rsquo;t use.</li>
+          <li>
+            Set aside one-time costs, deposits, fees, move-in expenses, separately from your monthly number so they
+            don&rsquo;t blindside you.
+          </li>
+        </ol>
+
+        <h2>FAQ</h2>
+        <h3>How much of my income should I spend on rent?</h3>
+        <p>
+          A common starting guideline is under 30% of take-home pay, but it flexes a lot depending on your other
+          costs and situation. There&rsquo;s no single correct number.
+        </p>
+
+        <h3>What if I don&rsquo;t have a steady income yet when I&rsquo;m apartment hunting?</h3>
+        <p>
+          Work backward from what you can comfortably commit to for the lease term, using savings, a new job&rsquo;s
+          expected pay, or whatever income picture you do have. A workable budget doesn&rsquo;t require a perfectly
+          steady paycheck to build.
+        </p>
+
+        <h3>What costs do people forget to budget for when apartment hunting?</h3>
+        <p>
+          Utilities, parking, application fees, deposits, and commute costs are the most commonly overlooked.
+          Together they can add hundreds of dollars a month to a listing&rsquo;s sticker price.
+        </p>
+
+        <h3>Is a cheaper apartment always the better deal?</h3>
+        <p>
+          Not necessarily. A lower rent further from work or with utilities excluded can end up costing more per
+          month than a pricier apartment closer in with utilities included. Total cost matters more than the listed
+          number.
+        </p>
+
+        <h3>Should I pay more for a shorter lease?</h3>
+        <p>
+          Often, yes, though it&rsquo;s always worth asking directly. Buildings sometimes offer promotions in slower
+          leasing months that aren&rsquo;t reflected in the listed price.
+        </p>
+
+        <h3>What should I prioritize spending on if my budget is tight?</h3>
+        <p>
+          Things that affect your daily experience directly: light, commute, noise control, and outdoor access tend
+          to matter more than square footage or amenities you won&rsquo;t regularly use.
+        </p>
+
+        <p>
+          A tight budget or an uncertain one doesn&rsquo;t mean a bad apartment, it means being precise about where
+          the money goes. ApartmentBuddy scores listings against what you actually said matters, not against square
+          footage or amenity checklists, so your budget goes toward fit instead of guesswork.
+        </p>
+        <p>
+          <a href="/#chat">Tell us what actually matters to you →</a>
+        </p>
+      </>
+    ),
+  },
 ]
 
 export function getBlogPost(slug: string): BlogPost | undefined {
