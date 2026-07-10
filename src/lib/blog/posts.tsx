@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { CtaButton } from '@/components/blog/CtaButton'
 
 export interface BlogPost {
   slug: string
@@ -109,9 +110,7 @@ export const blogPosts: BlogPost[] = [
           it and tell you why. The clearer you are with us, the better we can do our job. Vague in, vague out.
           Specific in, a place you actually love out.
         </p>
-        <p>
-          <a href="/#chat">Tell us what you actually want →</a>
-        </p>
+        <CtaButton href="/#chat">Tell us what you actually want →</CtaButton>
 
         <h2>FAQ</h2>
         <h3>Is it better to be flexible or picky when apartment hunting?</h3>
@@ -237,9 +236,7 @@ export const blogPosts: BlogPost[] = [
           nosy, but because the things that predict whether you&rsquo;ll actually be happy somewhere are rarely the
           things listing sites let you filter by.
         </p>
-        <p>
-          <a href="/#chat">Tell us what actually matters to you →</a>
-        </p>
+        <CtaButton href="/#chat">Tell us what actually matters to you →</CtaButton>
 
         <h2>FAQ</h2>
         <h3>What factors actually predict happiness in a living situation?</h3>
@@ -411,9 +408,7 @@ export const blogPosts: BlogPost[] = [
           data into ranked results, so the hours you do have go toward finding out what the neighborhood actually
           feels like.
         </p>
-        <p>
-          <a href="/#chat">Tell us what you&rsquo;re looking for →</a>
-        </p>
+        <CtaButton href="/#chat">Tell us what you&rsquo;re looking for →</CtaButton>
       </>
     ),
   },
@@ -543,9 +538,7 @@ export const blogPosts: BlogPost[] = [
           distance to the mountains, how much tree cover matters to you, whether you need a car-free life or
           you&rsquo;re fine driving — the better we can point you at the right block, not just the popular one.
         </p>
-        <p>
-          <a href="/#chat">Start your Denver search →</a>
-        </p>
+        <CtaButton href="/#chat">Start your Denver search →</CtaButton>
       </>
     ),
   },
@@ -679,9 +672,7 @@ export const blogPosts: BlogPost[] = [
           what ApartmentBuddy scores against, your actual answers on cost, space, location, and timeline, instead of
           handing you someone else&rsquo;s ranking.
         </p>
-        <p>
-          <a href="/#chat">Tell us your actual answers →</a>
-        </p>
+        <CtaButton href="/#chat">Tell us your actual answers →</CtaButton>
       </>
     ),
   },
@@ -851,9 +842,7 @@ export const blogPosts: BlogPost[] = [
           the money goes. ApartmentBuddy scores listings against what you actually said matters, not against square
           footage or amenity checklists, so your budget goes toward fit instead of guesswork.
         </p>
-        <p>
-          <a href="/#chat">Tell us what actually matters to you →</a>
-        </p>
+        <CtaButton href="/#chat">Tell us what actually matters to you →</CtaButton>
       </>
     ),
   },
@@ -1020,9 +1009,7 @@ export const blogPosts: BlogPost[] = [
           ground up is more your speed first,{' '}
           <a href="/blog/how-to-find-a-great-apartment-on-a-budget">start with the fundamentals</a>.
         </p>
-        <p>
-          <a href="/#chat">Tell us what actually matters to you →</a>
-        </p>
+        <CtaButton href="/#chat">Tell us what actually matters to you →</CtaButton>
       </>
     ),
   },
@@ -1215,9 +1202,7 @@ export const blogPosts: BlogPost[] = [
           missing document or a cost you didn&rsquo;t plan for. ApartmentBuddy surfaces the listings worth applying
           for, so the paperwork is the only thing left to race.
         </p>
-        <p>
-          <a href="/#chat">Start your search →</a>
-        </p>
+        <CtaButton href="/#chat">Start your search →</CtaButton>
       </>
     ),
   },
