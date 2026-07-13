@@ -251,13 +251,16 @@ $$ language plpgsql security definer;
 -- =========================================================
 
 create table public.chat_sessions (
-  id          uuid        primary key default gen_random_uuid(),
-  user_id     uuid        not null references auth.users,
-  intent      text        not null check (intent in ('onboarding', 'refinement', 'check-in', 'deep-dive')),
-  status      text        not null default 'open' check (status in ('open', 'resolved')),
-  context     jsonb,
-  created_at  timestamptz not null default now(),
-  resolved_at timestamptz
+  id               uuid        primary key default gen_random_uuid(),
+  user_id          uuid        not null references auth.users,
+  intent           text        not null check (intent in ('onboarding', 'refinement', 'check-in', 'deep-dive')),
+  status           text        not null default 'open' check (status in ('open', 'resolved')),
+  context          jsonb,
+  conversation_id  uuid        references conversations(id),
+  user_listing_id  uuid        references user_listings(id),
+  last_message_at  timestamp with time zone,
+  created_at       timestamptz not null default now(),
+  resolved_at      timestamptz
 );
 
 alter table public.chat_sessions enable row level security;
@@ -266,6 +269,39 @@ create policy "users manage own sessions"
   on public.chat_sessions for all
   using  (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- One open deep-dive session per user per listing.
+CREATE UNIQUE INDEX chat_sessions_deep_dive_unique ON public.chat_sessions USING btree (user_id, user_listing_id) WHERE ((intent = 'deep-dive'::text) AND (user_listing_id IS NOT NULL));
+
+-- One open onboarding/refinement (preferences) session per user.
+CREATE UNIQUE INDEX chat_sessions_preferences_unique ON public.chat_sessions USING btree (user_id) WHERE (intent = ANY (ARRAY['onboarding'::text, 'refinement'::text]));
+
+-- Finds the user's existing open deep-dive session for a listing, or creates one.
+CREATE OR REPLACE FUNCTION public.find_or_create_deep_dive_session(p_user_listing_id uuid)
+ RETURNS chat_sessions
+ LANGUAGE sql
+AS $function$
+  insert into public.chat_sessions (user_id, intent, status, user_listing_id)
+  select ul.user_id, 'deep-dive', 'open', ul.id
+  from public.user_listings ul
+  where ul.id = p_user_listing_id and ul.user_id = auth.uid()
+  on conflict (user_id, user_listing_id) where intent = 'deep-dive' and user_listing_id is not null
+  do update set user_id = excluded.user_id
+  returning *;
+$function$;
+
+-- Finds the user's existing open onboarding/refinement session, or creates one.
+CREATE OR REPLACE FUNCTION public.find_or_create_preferences_session()
+ RETURNS chat_sessions
+ LANGUAGE sql
+AS $function$
+  -- do update is a no-op; it exists only to force RETURNING of the existing row
+  insert into public.chat_sessions (user_id, intent, status)
+  values (auth.uid(), 'onboarding', 'open')
+  on conflict (user_id) where intent in ('onboarding', 'refinement')
+  do update set user_id = excluded.user_id
+  returning *;
+$function$;
 
 create table public.chat_messages (
   id          uuid        primary key default gen_random_uuid(),
