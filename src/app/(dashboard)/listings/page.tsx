@@ -270,10 +270,11 @@ function ListingsContent() {
   }
 
   async function applyCheckIn() {
+    const lastUserReply = [...checkInMessages].reverse().find(m => m.role === 'user')?.content
     await fetch('/api/preferences/apply-priorities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify(lastUserReply ? { reply: lastUserReply } : {}),
     })
     if (checkInSessionId) {
       fetch(`/api/chat/sessions/${checkInSessionId}`, {
@@ -699,7 +700,6 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
 function DeepDiveModal({ listing, onClose }: { listing: UserListing; onClose: () => void }) {
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -713,21 +713,20 @@ function DeepDiveModal({ listing, onClose }: { listing: UserListing; onClose: ()
     async function init() {
       setSending(true)
       try {
-        const sessionRes = await fetch('/api/chat/sessions', {
+        const sessionRes = await fetch('/api/chat/sessions/deep-dive', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            intent: 'deep-dive',
-            context: {
-              listing_id: listing.id,
-              score: listing.score,
-              score_breakdown: listing.score_breakdown,
-              score_reasoning: listing.score_reasoning,
-            },
-          }),
+          body: JSON.stringify({ user_listing_id: listing.id }),
         })
         const session = await sessionRes.json()
-        if (session.id) setSessionId(session.id)
+        if (!session.id) return
+        setSessionId(session.id)
+
+        if (Array.isArray(session.messages) && session.messages.length > 0) {
+          // Resuming an existing thread for this listing — don't re-send the opener.
+          setMessages(session.messages)
+          return
+        }
 
         const openingMessage = [
           `Explain why this listing scored ${listing.score}/100.`,
@@ -738,11 +737,10 @@ function DeepDiveModal({ listing, onClose }: { listing: UserListing; onClose: ()
         const chatRes = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: openingMessage, intent: 'deep-dive' }),
+          body: JSON.stringify({ message: openingMessage, sessionId: session.id }),
         })
         const data = await chatRes.json()
         if (data.message?.content) setMessages([{ role: 'assistant', content: data.message.content }])
-        if (data.conversationId) setConversationId(data.conversationId)
       } catch (err) {
         console.error('Deep-dive init error:', err)
       } finally {
@@ -774,11 +772,10 @@ function DeepDiveModal({ listing, onClose }: { listing: UserListing; onClose: ()
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, conversationId, intent: 'deep-dive' }),
+        body: JSON.stringify({ message: text, sessionId }),
       })
       const data = await res.json()
       if (data.message?.content) setMessages(prev => [...prev, { role: 'assistant', content: data.message.content }])
-      if (data.conversationId && !conversationId) setConversationId(data.conversationId)
     } catch (err) {
       console.error('Deep-dive send error:', err)
     } finally {

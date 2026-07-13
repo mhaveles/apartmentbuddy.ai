@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { Message } from '@/types'
 
 const INITIAL_MESSAGE: Message = {
@@ -16,10 +17,9 @@ function ChatContent() {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [preferencesExtracted, setPreferencesExtracted] = useState(false)
   const [hasNeighborhoods, setHasNeighborhoods] = useState(true)
-  const [onboardingSessionId, setOnboardingSessionId] = useState<string | null>(null)
   const [restoring, setRestoring] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -46,55 +46,25 @@ function ChatContent() {
       } catch {}
       const neighborhoodsList = Array.isArray(prefs?.neighborhoods) ? prefs!.neighborhoods as unknown[] : []
       setHasNeighborhoods(neighborhoodsList.length > 0)
+      if (prefs && Object.keys(prefs).length > 0) hasPreferences = true
 
       try {
-        const res = await fetch('/api/conversations/latest')
+        const res = await fetch('/api/chat/sessions/preferences', { method: 'POST' })
         if (res.ok) {
           const data = await res.json()
-          if (data && data.messages?.length > 0) {
+          setSessionId(data.id)
+          if (Array.isArray(data.messages) && data.messages.length > 0) {
             setMessages(data.messages)
-            setConversationId(data.id)
-            setPreferencesExtracted(data.preferences_extracted)
-            hasPreferences = !!data.preferences_extracted
           }
+          if (data.intent === 'refinement') hasPreferences = true
         }
       } catch {}
 
-      if (!hasPreferences && prefs && Object.keys(prefs).length > 0) hasPreferences = true
-
-      if (!hasPreferences) {
-        const existing = sessionStorage.getItem('onboardingSessionId')
-        if (existing) {
-          setOnboardingSessionId(existing)
-        } else {
-          try {
-            const sessionRes = await fetch('/api/chat/sessions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ intent: 'onboarding' }),
-            })
-            if (sessionRes.ok) {
-              const session = await sessionRes.json()
-              setOnboardingSessionId(session.id)
-              sessionStorage.setItem('onboardingSessionId', session.id)
-            }
-          } catch {}
-        }
-      }
-
+      setPreferencesExtracted(hasPreferences)
       setRestoring(false)
     }
     restore()
   }, [])
-
-  function startFresh() {
-    setMessages([INITIAL_MESSAGE])
-    setConversationId(null)
-    setPreferencesExtracted(false)
-    setOnboardingSessionId(null)
-    sessionStorage.removeItem('onboardingSessionId')
-    setInput('')
-  }
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return
@@ -109,11 +79,7 @@ function ChatContent() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          conversationId,
-          ...(onboardingSessionId ? { intent: 'onboarding' } : {}),
-        }),
+        body: JSON.stringify({ message: text, sessionId }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -124,20 +90,8 @@ function ChatContent() {
         }])
       } else {
         setMessages(prev => [...prev, data.message])
-        setConversationId(data.conversationId)
         if (typeof data.hasNeighborhoods === 'boolean') setHasNeighborhoods(data.hasNeighborhoods)
-        if (data.preferencesExtracted) {
-          setPreferencesExtracted(true)
-          if (onboardingSessionId) {
-            fetch(`/api/chat/sessions/${onboardingSessionId}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ status: 'resolved' }),
-            }).catch(() => {})
-            setOnboardingSessionId(null)
-            sessionStorage.removeItem('onboardingSessionId')
-          }
-        }
+        if (data.preferencesExtracted) setPreferencesExtracted(true)
       }
     } catch (err) {
       setMessages(prev => [...prev, {
@@ -148,7 +102,7 @@ function ChatContent() {
     } finally {
       setLoading(false)
     }
-  }, [loading, conversationId, onboardingSessionId])
+  }, [loading, sessionId])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -177,17 +131,17 @@ function ChatContent() {
           <h1 className="text-2xl font-bold text-gray-900">My Preferences</h1>
           <p className="text-gray-500 text-sm">Chat with AI to set your apartment criteria.</p>
         </div>
-        {conversationId && (
-          <button
-            onClick={startFresh}
+        {sessionId && (
+          <Link
+            href="/chat"
             className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5"
           >
             Start fresh
-          </button>
+          </Link>
         )}
       </div>
 
-      {hadIntakeIssue && !conversationId && (
+      {hadIntakeIssue && !sessionId && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600 mb-4">
           We couldn&apos;t recover the answers from your earlier chat — no worries, let&apos;s pick up here.
         </div>
@@ -196,14 +150,14 @@ function ChatContent() {
       {preferencesExtracted && hasNeighborhoods && (
         <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 mb-4 flex items-center justify-between">
           <span><span className="mr-1">✓</span> Got your preferences. <a href="/listings" className="font-medium underline">Run your first search</a> to see matching listings.</span>
-          <button onClick={startFresh} className="text-xs text-green-600 hover:text-green-800 underline ml-4 shrink-0">Update preferences</button>
+          <Link href="/chat" className="text-xs text-green-600 hover:text-green-800 underline ml-4 shrink-0">Update preferences</Link>
         </div>
       )}
 
       {preferencesExtracted && !hasNeighborhoods && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800 mb-4 flex items-center justify-between">
           <span><span className="mr-1">⚠</span> Got your other preferences, but I still need at least one neighborhood to search. <a href="/neighborhoods" className="font-medium underline">Add one</a> to get started.</span>
-          <button onClick={startFresh} className="text-xs text-amber-700 hover:text-amber-900 underline ml-4 shrink-0">Update preferences</button>
+          <Link href="/chat" className="text-xs text-amber-700 hover:text-amber-900 underline ml-4 shrink-0">Update preferences</Link>
         </div>
       )}
 
