@@ -85,8 +85,14 @@ export default function SignupModal({ sessionId, onClose }: { sessionId: string;
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 relative">
+    <div
+      className="fixed inset-0 bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-4 z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-lg border border-gray-100 w-full max-w-md p-8 relative"
+        onClick={e => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           aria-label="Close"
@@ -95,7 +101,7 @@ export default function SignupModal({ sessionId, onClose }: { sessionId: string;
           ✕
         </button>
 
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Almost there</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Save your search</h2>
 
         {needsConfirm ? (
           <p className="text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-lg px-3 py-2">
@@ -104,7 +110,9 @@ export default function SignupModal({ sessionId, onClose }: { sessionId: string;
         ) : (
           <>
             <p className="text-gray-500 text-sm mb-6">
-              Save your preferences and we&apos;ll start finding matches. No credit card required.
+              Create a free account so we can save what you told us and start searching for matches —
+              everything from this chat carries over, so you won&apos;t repeat yourself. We never sell
+              or share your info. No credit card required.
             </p>
 
             <button
