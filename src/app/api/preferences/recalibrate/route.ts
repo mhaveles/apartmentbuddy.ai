@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { getAnthropic } from '@/lib/anthropic'
 
 export async function POST(req: NextRequest) {
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const { userId } = await req.json()
   if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
 
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
 
   // Fetch voted listings ordered by disagreement (score_vote_delta ASC = AI liked it, user didn't)
   const { data: prefsRow } = await supabase

@@ -81,7 +81,7 @@ export async function PATCH(req: NextRequest) {
     updates.score_vote_delta = vote !== null && cur?.score != null ? cur.score * vote : null
   }
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('user_listings')
     .update(updates)
     .eq('id', id)
@@ -89,13 +89,22 @@ export async function PATCH(req: NextRequest) {
     .select()
     .single()
 
+  if (error) {
+    console.error('PATCH /api/listings update error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
   // After a vote, check if we've hit the recalibration threshold (10, 15, 20, ...)
   if (vote !== undefined && vote !== null) {
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from('user_listings')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .not('vote', 'is', null)
+
+    if (countError) {
+      console.error('PATCH /api/listings vote-count error:', countError)
+    }
 
     const totalVotes = count ?? 0
     if (totalVotes >= 10 && (totalVotes === 10 || totalVotes % 5 === 0)) {

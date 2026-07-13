@@ -199,13 +199,18 @@ function ListingsContent() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, ...updates }),
     })
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      console.error('Failed to update listing:', res.status, body)
+      return
+    }
     if (updates.is_dismissed) {
       setListings(prev => prev.filter(l => l.id !== id))
     } else {
       setListings(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))
     }
     // Check if a new priority suggestion was generated after this vote
-    if (updates.vote !== undefined && res.ok) {
+    if (updates.vote !== undefined) {
       fetch('/api/preferences').then(r => r.json()).then(prefs => {
         if (prefs?.priorities_suggestion) {
           setPrioritySuggestion(prefs.priorities_suggestion)
