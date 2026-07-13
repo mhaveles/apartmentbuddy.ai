@@ -2,7 +2,6 @@
 
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { Message } from '@/types'
 
 const INITIAL_MESSAGE: Message = {
@@ -131,14 +130,6 @@ function ChatContent() {
           <h1 className="text-2xl font-bold text-gray-900">My Preferences</h1>
           <p className="text-gray-500 text-sm">Chat with AI to set your apartment criteria.</p>
         </div>
-        {sessionId && (
-          <Link
-            href="/chat"
-            className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5"
-          >
-            Start fresh
-          </Link>
-        )}
       </div>
 
       {hadIntakeIssue && !sessionId && (
@@ -148,16 +139,14 @@ function ChatContent() {
       )}
 
       {preferencesExtracted && hasNeighborhoods && (
-        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 mb-4 flex items-center justify-between">
+        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 mb-4">
           <span><span className="mr-1">✓</span> Got your preferences. <a href="/listings" className="font-medium underline">Run your first search</a> to see matching listings.</span>
-          <Link href="/chat" className="text-xs text-green-600 hover:text-green-800 underline ml-4 shrink-0">Update preferences</Link>
         </div>
       )}
 
       {preferencesExtracted && !hasNeighborhoods && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800 mb-4 flex items-center justify-between">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800 mb-4">
           <span><span className="mr-1">⚠</span> Got your other preferences, but I still need at least one neighborhood to search. <a href="/neighborhoods" className="font-medium underline">Add one</a> to get started.</span>
-          <Link href="/chat" className="text-xs text-amber-700 hover:text-amber-900 underline ml-4 shrink-0">Update preferences</Link>
         </div>
       )}
 
