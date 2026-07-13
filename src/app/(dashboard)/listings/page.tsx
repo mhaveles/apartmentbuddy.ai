@@ -32,6 +32,7 @@ function ListingsContent() {
   const [checkInMessages, setCheckInMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
   const [checkInInput, setCheckInInput] = useState('')
   const [checkInSending, setCheckInSending] = useState(false)
+  const [checkInMinimized, setCheckInMinimized] = useState(false)
   const [deepDiveListing, setDeepDiveListing] = useState<UserListing | null>(null)
   const pollStartRef = useRef<number | null>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
@@ -229,6 +230,7 @@ function ListingsContent() {
       body: JSON.stringify({ intent: 'check-in', context: { insight: priorityInsight, suggestion: prioritySuggestion } }),
     }).then(r => r.json()).then(s => setCheckInSessionId(s.id)).catch(() => {})
     setCheckInMessages(priorityInsight ? [{ role: 'assistant' as const, content: priorityInsight }] : [])
+    setCheckInMinimized(false)
   }, [prioritySuggestion, checkInSessionId, priorityInsight])
 
   useEffect(() => {
@@ -285,6 +287,7 @@ function ListingsContent() {
     setCheckInSessionId(null)
     setCheckInConversationId(null)
     setCheckInMessages([])
+    setCheckInMinimized(false)
   }
 
   async function dismissCheckIn() {
@@ -300,9 +303,11 @@ function ListingsContent() {
     setCheckInSessionId(null)
     setCheckInConversationId(null)
     setCheckInMessages([])
+    setCheckInMinimized(false)
   }
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -413,67 +418,6 @@ function ListingsContent() {
           >
             {purchasing ? 'Redirecting…' : 'Get 3 more for $5'}
           </button>
-        </div>
-      )}
-
-      {prioritySuggestion && (
-        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-sm space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-violet-200 text-violet-700 flex items-center justify-center text-xs font-bold">AI</span>
-            <p className="font-medium text-violet-800">Scoring insight based on your votes</p>
-          </div>
-          <div className="flex gap-2 flex-wrap pl-8">
-            {Object.entries(prioritySuggestion).map(([dim, level]) => (
-              <span key={dim} className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-                level === 'high' ? 'bg-violet-100 text-violet-700 border-violet-200' :
-                level === 'low'  ? 'bg-gray-50 text-gray-500 border-gray-200' :
-                                   'bg-white text-violet-600 border-violet-100'
-              }`}>
-                {dim}: {level}
-              </span>
-            ))}
-          </div>
-          <div ref={chatScrollRef} className="pl-8 space-y-2 max-h-60 overflow-y-auto">
-            {checkInMessages.map((msg, i) => (
-              msg.role === 'assistant' ? (
-                <p key={i} className="text-violet-700 leading-relaxed">{msg.content}</p>
-              ) : (
-                <p key={i} className="text-gray-700 bg-white rounded-lg px-3 py-2 border border-violet-100">{msg.content}</p>
-              )
-            ))}
-            {checkInSending && <p className="text-violet-400 text-xs animate-pulse">Thinking…</p>}
-          </div>
-          <div className="flex gap-2 items-center pl-8">
-            <input
-              value={checkInInput}
-              onChange={e => setCheckInInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !checkInSending) { e.preventDefault(); sendCheckIn() } }}
-              placeholder="Reply to the AI…"
-              className="flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
-              disabled={checkInSending}
-            />
-            <button
-              onClick={sendCheckIn}
-              disabled={checkInSending || !checkInInput.trim()}
-              className="shrink-0 text-xs bg-violet-600 text-white px-3 py-2 rounded-lg hover:bg-violet-700 disabled:opacity-50 font-medium"
-            >
-              Send
-            </button>
-          </div>
-          <div className="flex gap-2 pl-8">
-            <button
-              onClick={applyCheckIn}
-              className="text-xs bg-violet-600 text-white px-3 py-1 rounded-lg hover:bg-violet-700 font-medium"
-            >
-              Apply these weights
-            </button>
-            <button
-              onClick={dismissCheckIn}
-              className="text-xs text-violet-500 hover:text-violet-700 underline"
-            >
-              Dismiss
-            </button>
-          </div>
         </div>
       )}
 
@@ -636,6 +580,88 @@ function ListingsContent() {
         })()}
       </div>
     </div>
+
+    {prioritySuggestion && (
+      <div className="fixed bottom-6 right-6 z-40 w-[calc(100vw-3rem)] max-w-sm">
+        {checkInMinimized ? (
+          <button
+            onClick={() => setCheckInMinimized(false)}
+            className="ml-auto flex items-center gap-2 bg-violet-600 text-white pl-3 pr-4 py-2.5 rounded-full shadow-lg hover:bg-violet-700 text-sm font-medium"
+          >
+            <span className="shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">AI</span>
+            Scoring insight ready
+          </button>
+        ) : (
+          <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-sm space-y-3 shadow-2xl max-h-[75vh] overflow-y-auto">
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 w-6 h-6 rounded-full bg-violet-200 text-violet-700 flex items-center justify-center text-xs font-bold">AI</span>
+              <p className="font-medium text-violet-800 flex-1">Scoring insight based on your votes</p>
+              <button
+                onClick={() => setCheckInMinimized(true)}
+                className="shrink-0 text-violet-400 hover:text-violet-700 text-lg leading-none px-1"
+                aria-label="Minimize"
+                title="Minimize"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex gap-2 flex-wrap pl-8">
+              {Object.entries(prioritySuggestion).map(([dim, level]) => (
+                <span key={dim} className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                  level === 'high' ? 'bg-violet-100 text-violet-700 border-violet-200' :
+                  level === 'low'  ? 'bg-gray-50 text-gray-500 border-gray-200' :
+                                     'bg-white text-violet-600 border-violet-100'
+                }`}>
+                  {dim}: {level}
+                </span>
+              ))}
+            </div>
+            <div ref={chatScrollRef} className="pl-8 space-y-2 max-h-60 overflow-y-auto">
+              {checkInMessages.map((msg, i) => (
+                msg.role === 'assistant' ? (
+                  <p key={i} className="text-violet-700 leading-relaxed">{msg.content}</p>
+                ) : (
+                  <p key={i} className="text-gray-700 bg-white rounded-lg px-3 py-2 border border-violet-100">{msg.content}</p>
+                )
+              ))}
+              {checkInSending && <p className="text-violet-400 text-xs animate-pulse">Thinking…</p>}
+            </div>
+            <div className="flex gap-2 items-center pl-8">
+              <input
+                value={checkInInput}
+                onChange={e => setCheckInInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !checkInSending) { e.preventDefault(); sendCheckIn() } }}
+                placeholder="Reply to the AI…"
+                className="flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                disabled={checkInSending}
+              />
+              <button
+                onClick={sendCheckIn}
+                disabled={checkInSending || !checkInInput.trim()}
+                className="shrink-0 text-xs bg-violet-600 text-white px-3 py-2 rounded-lg hover:bg-violet-700 disabled:opacity-50 font-medium"
+              >
+                Send
+              </button>
+            </div>
+            <div className="flex gap-2 pl-8">
+              <button
+                onClick={applyCheckIn}
+                className="text-xs bg-violet-600 text-white px-3 py-1 rounded-lg hover:bg-violet-700 font-medium"
+              >
+                Apply these weights
+              </button>
+              <button
+                onClick={dismissCheckIn}
+                className="text-xs text-violet-500 hover:text-violet-700 underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+    </>
   )
 }
 
