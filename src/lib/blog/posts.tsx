@@ -1742,6 +1742,168 @@ export const blogPosts: BlogPost[] = [
       </>
     ),
   },
+  {
+    slug: 'how-to-rent-an-apartment-youve-never-seen-in-person',
+    title: "How to Rent an Apartment You've Never Seen in Person",
+    description:
+      "Renting sight unseen is a legitimate way to secure a place when flying in to tour isn't realistic. Here's what to ask for, what to watch for, and how to protect yourself before you sign.",
+    publishedAt: '2026-07-16',
+    author: 'Jordan',
+    content: (
+      <>
+        <p>
+          Renting sight unseen is a legitimate way to secure a place when flying in to tour isn&rsquo;t realistic.
+          The process is just different. A photo gallery and a five-minute virtual tour weren&rsquo;t built to answer
+          the questions that actually matter when you can&rsquo;t walk the unit yourself, so the job is knowing what
+          to ask for instead.
+        </p>
+
+        <h2>What a virtual tour usually doesn&rsquo;t show you</h2>
+        <p>
+          Listing photos and pre-recorded video walkthroughs are marketing material, shot to make a unit look its
+          best, at its best time of day, from its best angles. That&rsquo;s normal, but it leaves real gaps. The same
+          split applies here that applies to any move into a city you&rsquo;ve never lived in: some things translate
+          from a screen, and some things only exist in person, or in this case, on a live call standing in for it.
+        </p>
+        <ul>
+          <li>
+            <strong>Natural light at a normal hour.</strong> Listing photos are often shot mid-day in ideal light.
+            Ask what direction the unit faces and what the light actually looks like in the morning or evening, when
+            you&rsquo;ll be home.
+          </li>
+          <li>
+            <strong>Noise.</strong> Street noise, neighbors, building mechanicals, none of this shows up in a photo
+            or a silent video pan. It&rsquo;s one of the most common regrets from a sight-unseen move.
+          </li>
+          <li>
+            <strong>Scale.</strong> Wide-angle lenses make small rooms look larger than they are. A listed square
+            footage number is more reliable than the photos for judging actual size.
+          </li>
+          <li>
+            <strong>Condition beyond the staged shot.</strong> Worn flooring just outside the frame, a water stain
+            the camera angle avoided, general upkeep of common areas. These are easy to miss in curated photos.
+          </li>
+        </ul>
+        <p>None of this means virtual tours are useless. It means they&rsquo;re a starting point.</p>
+
+        <h2>What to actually request from a landlord or leasing office</h2>
+        <p>
+          If you can&rsquo;t see it yourself, the fix is asking someone else to see it for you, in real time, on your
+          terms.
+        </p>
+        <ul>
+          <li>
+            <strong>A live video call, not another recorded tour.</strong> Ask the leasing agent to walk the unit
+            live on a call so you can direct where the camera goes: open the closets, run the faucets, show the view
+            out each window. A live call is much harder to stage than a pre-shot video.
+          </li>
+          <li>
+            <strong>A walk of the immediate block, not just the building lobby.</strong> Ask them to step outside and
+            pan the street. It tells you more about daily noise and feel than any interior shot will.
+          </li>
+          <li>
+            <strong>Direct answers on utilities, parking, and included appliances, confirmed in writing.</strong>{' '}
+            This is largely the same information ApartmentBuddy already tries to surface up front when it scores a
+            listing, so you&rsquo;re not starting the verification from zero on the call, you&rsquo;re confirming
+            what you already expected to find.
+          </li>
+          <li>
+            <strong>A recent, dated video.</strong> Ask when it was actually taken. Units change tenants, get
+            renovated, or age between when marketing material was shot and when you&rsquo;re applying.
+          </li>
+        </ul>
+        <p>
+          A responsive landlord willing to do a live call is itself a useful signal. One who resists is telling you
+          something too.
+        </p>
+
+        <h2>Red flags that only show up when you can&rsquo;t tour in person</h2>
+        <p>A few patterns worth watching for specifically in a sight-unseen situation:</p>
+        <ul>
+          <li>
+            <strong>Reluctance to do a live video call.</strong> If every request gets deflected back to &ldquo;the
+            photos speak for themselves,&rdquo; treat that response itself as meaningful information.
+          </li>
+          <li>
+            <strong>Pressure to send money before you&rsquo;ve seen anything live.</strong> A legitimate landlord can
+            wait for a live walkthrough before asking for a deposit. Urgency paired with payment requests before
+            verification is one of the more common signs of a scam listing, and it&rsquo;s worth pausing on
+            regardless of how good the price looks.
+          </li>
+          <li>
+            <strong>Inconsistent answers across conversations.</strong> If the square footage, included utilities, or
+            move-in date shift depending on who you ask, treat that as a reason to slow down and dig further.
+          </li>
+          <li>
+            <strong>Stock or clearly outdated photos.</strong> A reverse image search on a couple of listing photos
+            takes a minute and can save a lot of trouble if the photos turn out to belong to a different property
+            entirely.
+          </li>
+        </ul>
+
+        <h2>Build in protection before you sign</h2>
+        <p>
+          Even with a solid live walkthrough, a sight-unseen lease carries more inherent uncertainty than one where
+          you toured in person. A few ways to lower the risk without slowing the process down:
+        </p>
+        <ul>
+          <li>
+            Ask whether the lease has any early-exit provision if the unit turns out to be materially different from
+            what was represented.
+          </li>
+          <li>
+            Photograph everything the moment you get your keys, before moving anything in, so there&rsquo;s a clear
+            record if a dispute comes up later.
+          </li>
+          <li>
+            If you know anyone in the city, even a loose connection, a quick favor to drive by the building is worth
+            more than another round of photos.
+          </li>
+        </ul>
+
+        <h2>FAQ</h2>
+        <h3>Is it safe to rent an apartment without seeing it in person?</h3>
+        <p>
+          It can be, if you verify it properly. A live video walkthrough, written confirmation of what&rsquo;s
+          included, and basic scam-pattern awareness go a long way toward closing the gap that photos alone leave
+          open.
+        </p>
+
+        <h3>What should I ask a landlord to show me on a video call for a sight-unseen rental?</h3>
+        <p>
+          Ask them to walk the interior live, including closets and under sinks, run the faucets, and step outside to
+          pan the block. A live call is much harder to stage convincingly than pre-recorded marketing footage.
+        </p>
+
+        <h3>What are common scam signs when renting sight unseen?</h3>
+        <p>
+          Pressure to send money before a live walkthrough happens, reluctance to get on a video call, and
+          inconsistent details about the unit across different conversations are the most common warning signs.
+        </p>
+
+        <h3>How can I protect myself when signing a lease for a place I&rsquo;ve never seen?</h3>
+        <p>
+          Get everything discussed on a call confirmed in writing, ask about early-exit provisions in case the unit
+          doesn&rsquo;t match what was represented, and document the unit&rsquo;s condition thoroughly the day you
+          move in.
+        </p>
+
+        <h3>Do virtual tours show everything I need to know about an apartment?</h3>
+        <p>
+          No. They&rsquo;re a useful starting point but usually miss noise, real lighting conditions, true scale, and
+          the immediate neighborhood feel. A live walkthrough on your own terms fills in most of those gaps.
+        </p>
+
+        <p>
+          Sight-unseen doesn&rsquo;t mean less informed. It means asking better questions before you sign.{' '}
+          <Link href="/">ApartmentBuddy</Link> can&rsquo;t stand in the room for you, but it can do the early
+          legwork, surfacing listings that already fit your budget and priorities, so the live call you do make is
+          spent verifying the right place instead of screening ten wrong ones.
+        </p>
+        <CtaButton href="/#chat">Start your search →</CtaButton>
+      </>
+    ),
+  },
 ]
 
 export function getBlogPost(slug: string): BlogPost | undefined {
