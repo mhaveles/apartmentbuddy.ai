@@ -1420,6 +1420,13 @@ export const blogPosts: BlogPost[] = [
           exhausted to enjoy putting together. Run the actual comparison rather than assuming unfurnished wins by
           default.
         </p>
+        <p>
+          If you matched recently and are still figuring out how to sequence the search itself, see{' '}
+          <Link href="/blog/residency-match-to-move-in-day-10-week-window">
+            Residency Match to Move-In Day: Finding a Place in the 10-Week Window
+          </Link>{' '}
+          for a week-by-week breakdown of what to do between Match Day and July 1.
+        </p>
 
         <h2>FAQ</h2>
         <h3>What should residents prioritize when apartment hunting?</h3>
@@ -1899,6 +1906,186 @@ export const blogPosts: BlogPost[] = [
           <Link href="/">ApartmentBuddy</Link> can&rsquo;t stand in the room for you, but it can do the early
           legwork, surfacing listings that already fit your budget and priorities, so the live call you do make is
           spent verifying the right place instead of screening ten wrong ones.
+        </p>
+        <CtaButton href="/#chat">Start your search →</CtaButton>
+      </>
+    ),
+  },
+  {
+    slug: 'residency-match-to-move-in-day-10-week-window',
+    title: 'Residency Match to Move-In Day: Finding a Place in the 10-Week Window',
+    description:
+      "Match Day tells you where you're going. July 1 is when you need to be living there. Here's how to use the roughly 10 weeks in between to find, apply for, and move into a place.",
+    publishedAt: '2026-07-17',
+    author: 'Jordan',
+    content: (
+      <>
+        <p>
+          Match Day tells you where you&rsquo;re going. July 1 is when you need to be living there, ready to work. In
+          between is roughly 10 weeks to find, apply for, and move into a place, in a city you may have never set
+          foot in, on top of everything else that comes with finishing med school and starting residency. The
+          timeline is tight, but it&rsquo;s workable if the weeks get used in the right order.
+        </p>
+
+        <h2>Match week: the groundwork, before you look at a single listing</h2>
+        <p>
+          The days right after Match Day are for orienting, not browsing listings yet. Get clear on what actually
+          matters for your specific rotation before you start looking: worst-case commute after a hard shift, noise
+          and light control for daytime sleep, and the fact that you&rsquo;re likely settling in for the whole
+          program rather than planning to move again.
+        </p>
+        <ul>
+          <li>Set a budget based on your actual starting salary, not a rough guess carried over from med school assumptions.</li>
+          <li>
+            Identify which hospital-adjacent neighborhoods residents in your program actually live in. Programs and
+            current residents are a faster source of truth here than generic city guides.
+          </li>
+          <li>
+            Skip trying to learn the whole city. You need a short list of neighborhoods that work for your hospital
+            and your shift pattern, not a comprehensive map of the metro area.
+          </li>
+        </ul>
+
+        <h2>Weeks 2-3: start looking, get a feel for the market</h2>
+        <p>
+          This is the week to open listings and see what your budget actually gets near your hospital specifically,
+          not the city as a whole.
+        </p>
+        <ul>
+          <li>
+            Compare listings across your shortlisted neighborhoods and note how commute times hold up during
+            realistic hours, not just off-peak.
+          </li>
+          <li>
+            If a current resident in the program is willing to talk, ask them directly what they wish they&rsquo;d
+            known before signing. This tends to surface things no listing mentions.
+          </li>
+          <li>
+            Skip scheduling in-person tours yet unless you&rsquo;re already local to the area. Photos and virtual
+            walkthroughs are enough for this stage.
+          </li>
+        </ul>
+
+        <h2>Weeks 4-5: paperwork, before you&rsquo;re competing for a specific unit</h2>
+        <p>
+          Get your application materials ready before you need them, not while a good listing is sitting there
+          waiting on you.
+        </p>
+        <ul>
+          <li>
+            Have proof of income, ID, and references ready to go, including your residency offer letter or program
+            confirmation, since that&rsquo;s often what stands in for a traditional pay stub this early.
+          </li>
+          <li>
+            Line up a co-signer in advance if your starting salary or credit history might make one necessary. This
+            step takes longer than people expect.
+          </li>
+          <li>
+            Skip perfecting the paperwork. A complete, ready packet beats a polished one that&rsquo;s still not done
+            when the right unit shows up.
+          </li>
+        </ul>
+
+        <h2>Weeks 6-7: apply and move fast on anything that fits</h2>
+        <p>
+          Once you&rsquo;ve found listings that genuinely match your priorities, especially the sleep and commute
+          factors that matter more for residents than almost anyone else, apply immediately. Hospital-adjacent
+          housing in a lot of markets gets absorbed quickly every summer by the same incoming class you&rsquo;re part
+          of.
+        </p>
+        <ul>
+          <li>
+            If you&rsquo;re applying from another city, ask for a live video walkthrough rather than relying on
+            listing photos alone, and confirm noise levels and light exposure directly, since these matter more to
+            you than a typical renter. See{' '}
+            <Link href="/blog/how-to-rent-an-apartment-youve-never-seen-in-person">
+              how to rent an apartment you&rsquo;ve never seen in person
+            </Link>{' '}
+            for how to run that call.
+          </li>
+          <li>
+            Because most residents settle into one place for the length of the program, treat this decision with the
+            weight of a longer-term commitment rather than a placeholder you&rsquo;ll fix later.
+          </li>
+          <li>
+            Run your shortlist through ApartmentBuddy before you apply. It scores listings against commute at
+            realistic hours and quiet for daytime sleep, which cuts down how many buildings you have to manually vet
+            yourself during a week that doesn&rsquo;t have much slack in it.
+          </li>
+        </ul>
+
+        <h2>Weeks 8-9: sign, then immediately start the logistics with lead time</h2>
+        <p>
+          Once you&rsquo;ve signed, shift straight into the parts of moving that take longer than a single day.
+        </p>
+        <ul>
+          <li>Start utility setup right away. Some providers take a week or more to activate.</li>
+          <li>
+            Confirm renters insurance requirements, since many buildings require it, and get a policy in place before
+            move-in.
+          </li>
+          <li>
+            Book movers or a truck rental now. Early July is a heavy moving season in most residency markets, and
+            availability tightens fast.
+          </li>
+        </ul>
+
+        <h2>Week 10: the final stretch before July 1</h2>
+        <ul>
+          <li>
+            Confirm your move-in date and time, and ask about parking or elevator reservations if your building needs
+            them.
+          </li>
+          <li>Set up mail forwarding.</li>
+          <li>Photograph the unit&rsquo;s condition the day you get your keys, before anything gets moved in.</li>
+        </ul>
+
+        <h2>What to skip entirely on this timeline</h2>
+        <p>
+          A handful of things that matter for a slower search but aren&rsquo;t worth the time in a 10-week window:
+          comparing every neighborhood in the metro area instead of just the hospital-adjacent ones, waiting on a
+          specific building hoping a better unit opens up, and treating this as a temporary placeholder decision when
+          the far more common pattern is staying put for the whole program.
+        </p>
+
+        <h2>FAQ</h2>
+        <h3>How much time do residents typically have to find housing after Match Day?</h3>
+        <p>
+          Roughly 10 weeks, from mid-March Match results to a July 1 start date, which is enough time when the search
+          is sequenced well, though it leaves little slack for an unstructured or exhaustive process.
+        </p>
+
+        <h3>Where should residents live relative to their hospital?</h3>
+        <p>
+          As close as budget and building quality allow, with commute measured against realistic post-shift
+          conditions rather than average traffic. Current residents in the program are usually the fastest way to
+          identify which specific neighborhoods actually work.
+        </p>
+
+        <h3>Should residents sign a long lease even though they&rsquo;ve never lived in the city?</h3>
+        <p>
+          Usually yes. Most residents settle into one apartment for the full length of the program rather than
+          moving again, which makes a longer lease a practical strength rather than a risk.
+        </p>
+
+        <h3>What should residents do first after Match Day if they&rsquo;re apartment hunting?</h3>
+        <p>
+          Set a realistic budget based on actual starting salary and identify hospital-adjacent neighborhoods before
+          browsing individual listings. Groundwork first keeps the rest of the 10 weeks efficient.
+        </p>
+
+        <h3>What do residents commonly wish they&rsquo;d known before signing a lease?</h3>
+        <p>
+          Real noise and light conditions for daytime sleep, and what the commute actually feels like after a hard
+          shift rather than at a normal hour, are the two things residents most often say they underweighted before
+          moving in.
+        </p>
+
+        <p>
+          Ten weeks between Match Day and move-in isn&rsquo;t much room for a search that requires seeing ten
+          buildings in person. <Link href="/">ApartmentBuddy</Link> front-loads the filtering, commute at the hours
+          you&rsquo;ll actually be driving, quiet for the sleep you&rsquo;ll actually be getting, so the weeks you do
+          have go toward confirming the right place instead of finding it from scratch.
         </p>
         <CtaButton href="/#chat">Start your search →</CtaButton>
       </>
