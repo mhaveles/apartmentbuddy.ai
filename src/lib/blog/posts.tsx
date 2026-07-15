@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import { CtaButton } from '@/components/blog/CtaButton'
 
 export interface BlogPost {
@@ -1575,6 +1576,169 @@ export const blogPosts: BlogPost[] = [
           worth building a semester around.
         </p>
         <CtaButton href="/#chat">Start a search →</CtaButton>
+      </>
+    ),
+  },
+  {
+    slug: 'grad-school-apartment-hunting-timeline',
+    title: 'The Grad School Apartment-Hunting Timeline: What to Do in Each of Your 6-8 Weeks Before Move-In',
+    description:
+      "Most grad students get 6 to 8 weeks between acceptance and move-in. Here's the week-by-week order of operations that works on a compressed timeline, and what's safe to skip.",
+    publishedAt: '2026-07-15',
+    author: 'Jordan',
+    content: (
+      <>
+        <p>
+          Most grad students don&rsquo;t get six months of notice. Acceptance and funding decisions often land 6 to
+          8 weeks before classes start, which means the apartment search has to move fast without turning into a
+          rushed, regret-it-later decision. There&rsquo;s a real order of operations that works on this timeline.
+          Here&rsquo;s what to prioritize each week, and what&rsquo;s safe to skip.
+        </p>
+
+        <h2>As soon as you know your city: the groundwork week</h2>
+        <p>
+          Before you look at a single listing, spend a few days on the research that doesn&rsquo;t require being
+          there in person. If you&rsquo;re moving somewhere you&rsquo;ve never lived, this is the highest-leverage
+          time you&rsquo;ll spend in the whole search, because everything after this point moves faster if you
+          already know what you&rsquo;re looking for.
+        </p>
+        <ul>
+          <li>Set your budget ceiling based on your stipend or funding package rather than a generic rule of thumb.</li>
+          <li>
+            Get clear on what you&rsquo;re actually optimizing for: commute to campus, quiet for research hours,
+            roommates or living alone.
+          </li>
+          <li>
+            Skip trying to become an instant expert on every neighborhood in the city. You don&rsquo;t need ten
+            options, you need three or four that plausibly fit your non-negotiables.
+          </li>
+        </ul>
+
+        <h2>6 weeks out: start looking, don&rsquo;t start applying yet</h2>
+        <p>
+          This is the week to open listings across the sites we search, Zillow, Trulia, Craigslist, the pond we all
+          swim in, and get a real feel for what your budget actually gets you in this specific city. Treat it as
+          calibration first, decisions come later.
+        </p>
+        <ul>
+          <li>Browse broadly across your shortlisted neighborhoods to see where price and unit quality actually land.</li>
+          <li>Note patterns: which areas are consistently out of budget, which are consistently underwhelming for the price.</li>
+          <li>
+            Skip scheduling in-person tours this early unless you&rsquo;re already local. Virtual tours and detailed
+            photos are enough at this stage.
+          </li>
+        </ul>
+
+        <h2>4-5 weeks out: get your paperwork ready before you need it</h2>
+        <p>
+          This is the week that determines whether you can move fast when the right listing shows up. Get your
+          application paperwork in order now, proof of income or a funding letter, references, ID, so there&rsquo;s
+          zero delay between finding a place and applying for it.
+        </p>
+        <ul>
+          <li>
+            Confirm what documentation your program can provide (offer letters, stipend confirmation) since landlords
+            don&rsquo;t always know how to evaluate grad funding as income.
+          </li>
+          <li>Line up a co-signer if you think you&rsquo;ll need one. This takes longer to arrange than people expect.</li>
+          <li>
+            Skip perfecting your applications. A solid, ready-to-go packet beats a polished one that&rsquo;s still not
+            finished when a good listing appears.
+          </li>
+        </ul>
+
+        <h2>3 weeks out: apply and move quickly on anything that fits</h2>
+        <p>
+          At this point you should be applying to places that clearly meet your priorities instead of continuing to
+          browse. Speed here is a legitimate strategy in its own right, especially on a compressed timeline like this
+          one.
+        </p>
+        <ul>
+          <li>
+            Apply the same day you find a listing that fits, competitive markets move fast and good units
+            don&rsquo;t wait.
+          </li>
+          <li>
+            If you&rsquo;re applying sight unseen, ask direct questions instead of hoping the listing photos tell the
+            whole story: current condition, actual utility costs, noise level.
+          </li>
+          <li>
+            Skip holding out for a theoretically better option once you&rsquo;ve found one that hits your real
+            priorities. On this timeline, good and available beats perfect and still searching.
+          </li>
+        </ul>
+
+        <h2>2 weeks out: sign, and start the logistics that take lead time</h2>
+        <p>
+          Once you&rsquo;ve signed, shift immediately to the parts of moving that take longer than a day to sort out.
+        </p>
+        <ul>
+          <li>Start utility setup now. Some providers take a week or more to activate service.</li>
+          <li>Confirm renters insurance requirements and get a policy started before move-in day.</li>
+          <li>
+            Book movers or a truck rental now if you need one. This window fills up fast, especially around the start
+            of a semester when a lot of people are moving at once.
+          </li>
+        </ul>
+
+        <h2>1 week out: the logistics that only matter right before you land</h2>
+        <ul>
+          <li>
+            Confirm your move-in date and time with the building, and ask about parking or elevator reservations if
+            you&rsquo;ll need them.
+          </li>
+          <li>Set up mail forwarding.</li>
+          <li>Photograph the unit&rsquo;s condition the day you get your keys, before you move anything in.</li>
+        </ul>
+
+        <h2>What to skip entirely on this timeline</h2>
+        <p>
+          A few things that matter for a slower search but aren&rsquo;t worth the time on 6-8 weeks: waiting for a
+          lower-priced unit to open up in a specific building, an exhaustive comparison of every neighborhood in the
+          city, and furnishing decisions made before you&rsquo;ve actually seen the space in person or on a real
+          floor plan. None of these move the needle enough to justify the time they take from a compressed search.
+        </p>
+
+        <h2>FAQ</h2>
+        <h3>How far in advance should grad students start looking for an apartment?</h3>
+        <p>
+          Start the groundwork, budget, priorities, and a shortlist of neighborhoods, as soon as you know your city,
+          even if that&rsquo;s only 6 to 8 weeks before classes start. Start actually browsing listings around the
+          6-week mark.
+        </p>
+
+        <h3>Is 6 to 8 weeks enough time to find a good apartment for grad school?</h3>
+        <p>
+          Yes, if the time is used in the right order. Research and paperwork prep early, active searching and
+          applying in the middle weeks, and logistics like utilities and movers locked in as soon as you sign.
+        </p>
+
+        <h3>What should grad students prioritize first when apartment hunting on a short timeline?</h3>
+        <p>
+          Get application paperwork ready before you start applying, proof of income or a stipend letter, references,
+          ID, since delays here are what cost people good listings on a compressed schedule.
+        </p>
+
+        <h3>Should grad students wait for a better apartment to become available?</h3>
+        <p>
+          Generally no, on this timeline. If a listing meets your real priorities, applying quickly matters more than
+          holding out for a marginally better option that may not appear in time.
+        </p>
+
+        <h3>What apartment-hunting steps can grad students skip when short on time?</h3>
+        <p>
+          Exhaustive neighborhood comparisons, waiting on a specific building to have an opening, and furnishing
+          decisions made before seeing the actual space. None of these are worth the time on a 6-8 week timeline.
+        </p>
+
+        <p>
+          Six to eight weeks sounds tight until it&rsquo;s broken into what actually needs doing each week.{' '}
+          <Link href="/">ApartmentBuddy</Link> fits into week one: tell it your budget and priorities, and it starts
+          surfacing listings that match across every site in the pond while you&rsquo;re still getting your paperwork
+          together, so the searching becomes the chore ApartmentBuddy handles and the deciding stays yours.
+        </p>
+
+        <CtaButton href="/#chat">Start your search →</CtaButton>
       </>
     ),
   },
