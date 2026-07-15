@@ -2091,6 +2091,162 @@ export const blogPosts: BlogPost[] = [
       </>
     ),
   },
+  {
+    slug: 'job-relocation-in-6-weeks-zero-local-knowledge',
+    title: 'Job Relocation in 6 Weeks: How to Apartment-Hunt With Zero Local Knowledge',
+    description:
+      "A job offer with a six-week start date doesn't leave room to learn a new city the slow way. Here's a structure that works without local knowledge to lean on.",
+    publishedAt: '2026-07-18',
+    author: 'Jordan',
+    content: (
+      <>
+        <p>
+          A job offer with a six-week start date doesn&rsquo;t leave room to learn a new city the slow way. No years
+          of visiting, no friend who already lives there to text for advice, just a start date and a metro area you
+          may have never set foot in. That&rsquo;s a real constraint, not a disadvantage you need to apologize for.
+          The search just needs a structure that works without local knowledge to lean on.
+        </p>
+
+        <h2>Week 1: ask HR before you ask anything else</h2>
+        <p>
+          Before you open a single listing, find out what your employer is actually offering, since it changes the
+          whole shape of the search.
+        </p>
+        <ul>
+          <li>
+            Ask directly about a relocation stipend or reimbursement, and what it covers: moving costs, temporary
+            housing, broker fees. Companies don&rsquo;t always volunteer the full package unless asked.
+          </li>
+          <li>
+            Ask about temporary housing options if your start date is tight. Some employers offer a short-term
+            corporate apartment or hotel stay, which can buy you real time to find a permanent place without the
+            search dictating your start date.
+          </li>
+          <li>Ask if there&rsquo;s any flexibility on the start date itself. A week or two of breathing room changes what&rsquo;s realistic in the search.</li>
+          <li>
+            Ask if anyone else on the team has relocated recently. A colleague who made the same move six months ago
+            is a faster source of neighborhood truth than anything you&rsquo;ll find searching alone.
+          </li>
+        </ul>
+
+        <h2>Week 1-2: build your shortlist using what actually translates from a screen</h2>
+        <p>
+          Split your research the way you would for{' '}
+          <Link href="/blog/moving-somewhere-youve-never-been-how-to-prepare">any move into an unfamiliar city</Link>
+          : commute time, price per square foot, and general safety data all translate fine from a screen. What a
+          neighborhood actually feels like day to day doesn&rsquo;t, so treat that gap as something to close with
+          people who actually live there.
+        </p>
+        <ul>
+          <li>
+            Anchor your commute priority to the actual office location, since &ldquo;close to downtown&rdquo; rarely
+            means what it sounds like once you check the map against real drive times.
+          </li>
+          <li>
+            <Link href="/blog/questions-to-ask-before-which-neighborhood-is-best">
+              Get clear on what you&rsquo;re optimizing for
+            </Link>{' '}
+            before comparing neighborhoods against each other, since cost, space, and location trade off against one
+            another no matter which city you land in.
+          </li>
+          <li>
+            Post in a local subreddit or city-specific group and ask direct questions: what they&rsquo;d tell a
+            friend to avoid, since specific answers beat general praise every time.
+          </li>
+        </ul>
+
+        <h2>Week 3: apply broadly, treat speed as a real strategy</h2>
+        <p>
+          By this point, apply to places that clearly fit your priorities as soon as you find them. Given the
+          timeline,{' '}
+          <Link href="/blog/ill-take-anything-worst-apartment-search-strategy">
+            prioritizing a faster search over an exhaustive one
+          </Link>{' '}
+          is a legitimate approach, and it&rsquo;s one ApartmentBuddy is built around: tell it your budget and
+          commute priorities once, and it keeps surfacing matches across sources while you&rsquo;re focused on the
+          parts of the move that actually need your attention.
+        </p>
+        <ul>
+          <li>Have your paperwork ready before you need it: proof of income (an offer letter usually works), references, ID.</li>
+          <li>If you can&rsquo;t tour in person, ask for a live video walkthrough and confirm details in writing.</li>
+          <li>
+            Watch for the usual{' '}
+            <Link href="/blog/how-to-rent-an-apartment-youve-never-seen-in-person">sight-unseen red flags</Link>:
+            pressure to pay before a live walkthrough, reluctance to get on a call, inconsistent answers about the
+            unit.
+          </li>
+        </ul>
+
+        <h2>Week 4: sign, then start the logistics that take lead time</h2>
+        <ul>
+          <li>Start utility setup immediately. Some providers take a week or more to activate service.</li>
+          <li>Confirm renters insurance requirements and get a policy in place before move-in day.</li>
+          <li>Book movers or a truck rental now, especially if you&rsquo;re relocating during a popular moving season.</li>
+        </ul>
+
+        <h2>Week 5-6: the final stretch</h2>
+        <ul>
+          <li>Confirm your move-in date and time, and ask about parking or building access if needed.</li>
+          <li>Set up mail forwarding and update your address with anything time-sensitive.</li>
+          <li>
+            Photograph the unit&rsquo;s condition the day you get your keys, before anything gets moved in, so
+            there&rsquo;s a clear record if a deposit dispute comes up later.
+          </li>
+        </ul>
+
+        <h2>What to skip when you&rsquo;re working with zero local knowledge and six weeks</h2>
+        <p>
+          A few things that matter for a slower, better-informed search but aren&rsquo;t worth the time here: trying
+          to become a genuine local expert before you&rsquo;ve even moved, holding out for a marginally better unit
+          once you&rsquo;ve found one that fits, and spreading research evenly across every neighborhood in the metro
+          area when only two or three actually fit your commute and budget.
+        </p>
+
+        <h2>FAQ</h2>
+        <h3>How do I apartment hunt in a city I&rsquo;ve never visited on a tight relocation timeline?</h3>
+        <p>
+          Split your research into what translates from a screen, commute, price, safety data, and what doesn&rsquo;t,
+          neighborhood feel, noise, day-to-day vibe. Get the first set online and the second from people who actually
+          live there, then move quickly once you&rsquo;ve found something that fits.
+        </p>
+
+        <h3>What should I ask my employer about before starting an apartment search?</h3>
+        <p>
+          Ask about a relocation stipend or reimbursement, whether temporary housing is available, and whether
+          there&rsquo;s any flexibility on your start date. All three directly affect how much time and budget you
+          actually have for the search.
+        </p>
+
+        <h3>Is six weeks enough time to find a good apartment in a new city?</h3>
+        <p>
+          Yes, if the time is used in the right order: employer benefits and priorities first, a screen-researched
+          shortlist second, then applying quickly once something fits.
+        </p>
+
+        <h3>Should I rent sight unseen if I can&rsquo;t travel to tour apartments before relocating?</h3>
+        <p>
+          It&rsquo;s a legitimate option if you verify properly: a live video walkthrough, written confirmation of
+          what&rsquo;s included, and basic awareness of common scam patterns close most of the gap that photos alone
+          leave open.
+        </p>
+
+        <h3>How do I find honest information about a neighborhood I&rsquo;ve never visited?</h3>
+        <p>
+          Local subreddits, city-specific Facebook groups, and colleagues who&rsquo;ve made the same move are more
+          useful than generic city guides. Ask what people would tell a friend to avoid, not just what they&rsquo;d
+          recommend.
+        </p>
+
+        <p>
+          Zero local knowledge and six weeks isn&rsquo;t an ideal starting point, but it&rsquo;s a workable one with
+          the right structure. <Link href="/">ApartmentBuddy</Link> handles the sorting, budget, commute, and
+          priorities scored against listings from day one, so the local knowledge you&rsquo;re missing matters less
+          than it would searching on your own.
+        </p>
+        <CtaButton href="/#chat">Start your search →</CtaButton>
+      </>
+    ),
+  },
 ]
 
 export function getBlogPost(slug: string): BlogPost | undefined {
