@@ -24,6 +24,8 @@ export interface ScrapedListing {
   amenities: string[]
   description: string | null
   images: string[]
+  lat?: number | null
+  lon?: number | null
 }
 
 type MapBounds = { north: number; south: number; east: number; west: number }
@@ -170,67 +172,55 @@ export async function startApartmentsComScrape(
   }, buildWebhooks(webhookUrl, searchRunId, 'apartments_com'))
 }
 
-function buildCraigslistUrl(
-  n: { city: string; state: string; neighborhood: string; zip_code?: string | null; map_bounds?: MapBounds | null },
-  preferences?: { max_rent?: number | null; min_bedrooms?: number | null; max_bedrooms?: number | null; pet_friendly?: boolean | null }
-): string {
-  // Build a full Craigslist search URL using their native filter parameters.
-  // This mirrors exactly what a user would do manually — geographic radius, bedroom range, pets, price.
-  const cityDomain = n.city.toLowerCase().replace(/\s+/g, '')
-  const base = `https://${cityDomain}.craigslist.org/search/apa`
+// Craigslist subdomains that don't match a naive lowercase-and-strip-spaces of the city name.
+// Not exhaustive — the actor's city enum has hundreds of entries we can't validate offline.
+// Anything not in this map falls through to naive normalization; if that guess is wrong, Apify's
+// own input validation rejects the run at start time, which surfaces via the existing
+// Promise.allSettled failure path in search-trigger.ts rather than failing silently.
+const CRAIGSLIST_CITY_OVERRIDES: Record<string, string> = {
+  'san francisco': 'sfbay',
+  'oakland': 'sfbay',
+  'san jose': 'sfbay',
+  'washington': 'washingtondc',
+  'washington dc': 'washingtondc',
+}
 
-  const params = new URLSearchParams()
-
-  // Geographic targeting: prefer zip code + radius, fall back to lat/lon from map_bounds
-  if (n.zip_code) {
-    params.set('postal', n.zip_code)
-    params.set('search_distance', '3')  // 3 mile radius — tight neighborhood scope
-  } else if (n.map_bounds) {
-    params.set('lat', ((n.map_bounds.north + n.map_bounds.south) / 2).toFixed(4))
-    params.set('lon', ((n.map_bounds.east + n.map_bounds.west) / 2).toFixed(4))
-    params.set('search_distance', '3')
-  }
-
-  // Bedroom range from preferences
-  if (preferences?.min_bedrooms != null) {
-    params.set('min_bedrooms', String(preferences.min_bedrooms))
-  }
-  if (preferences?.max_bedrooms != null) {
-    params.set('max_bedrooms', String(preferences.max_bedrooms))
-  } else if (preferences?.min_bedrooms != null) {
-    params.set('max_bedrooms', String(preferences.min_bedrooms + 1))  // default: min and one size up
-  }
-
-  // Price ceiling (max_rent stored in cents → convert to dollars)
-  if (preferences?.max_rent) {
-    params.set('max_price', String(Math.round(preferences.max_rent / 100)))
-  }
-
-  // Pet policy
-  if (preferences?.pet_friendly) {
-    params.set('pets_dog', '1')
-    params.set('pets_cat', '1')
-  }
-
-  params.set('sort', 'date')
-  return `${base}?${params.toString()}`
+function resolveCraigslistCity(city: string): string | null {
+  const key = city.trim().toLowerCase()
+  if (!key) return null
+  return CRAIGSLIST_CITY_OVERRIDES[key] || key.replace(/\s+/g, '')
 }
 
 export async function startCraigslistScrape(
   neighborhoods: Neighborhood,
   webhookUrl: string,
   searchRunId: string,
-  preferences?: { max_rent?: number | null; min_bedrooms?: number | null; max_bedrooms?: number | null; pet_friendly?: boolean | null }
-): Promise<string> {
+  preferences?: { max_rent?: number | null }
+): Promise<string | null> {
+  // automation-lab/craigslist-scraper is searchQueries/city/category driven, not startUrls-driven
+  // (startUrls is not a supported input on this actor — see docs/chunk-1-scraper-diagnosis.md).
+  // No native bedroom filter exists on this actor, so bedroom targeting is intentionally left
+  // out here and handled at scoring time instead.
   const first = neighborhoods[0]
-  // Use a geographic search URL instead of text searchQueries — this finds all apartments
-  // in the zip code radius rather than doing a keyword match which returns very few results.
-  const searchUrl = buildCraigslistUrl(first, preferences)
-  console.log(`[CRAIGSLIST] search URL: ${searchUrl}`)
+  const city = resolveCraigslistCity(first.city)
+  if (!city) {
+    console.warn(`[CRAIGSLIST] could not resolve a Craigslist subdomain for city "${first.city}" — skipping`)
+    return null
+  }
+
   return startActor('automation-lab/craigslist-scraper', {
-    startUrls: [{ url: searchUrl }],
-    includeDetails: true,
+    // Empty array, not a keyword like "apartment" — live-tested (chunk 2) against a Denver
+    // "housing" search: 9/10 real apartment listings didn't contain the literal word "apartment"
+    // in their title, so a keyword filter here would have silently dropped most legitimate
+    // results. Schema marks this "required" but the actor accepts [] fine (confirmed live) and
+    // uses it to mean "no keyword filter, browse the whole category."
+    searchQueries: [],
+    city,
+    category: 'housing',
     maxResults: 100,
+    includeDetails: true,
+    // Confirmed live (chunk 2): maxPrice is dollars, not cents — same convention as Zillow/Trulia.
+    ...(preferences?.max_rent && { maxPrice: Math.round(preferences.max_rent / 100) }),
   }, buildWebhooks(webhookUrl, searchRunId, 'craigslist'))
 }
 
@@ -301,6 +291,33 @@ function sanitizeSqft(val: number | null | undefined): number | null {
   const n = Number(val)
   if (n < 100 || n > 4000) return null
   return n
+}
+
+function asRecord(val: unknown): Record<string, unknown> | null {
+  return val && typeof val === 'object' ? (val as Record<string, unknown>) : null
+}
+
+// Confirmed live (chunk 2, Denver test): top-level `latitude`/`longitude`, populated on
+// 20/20 sampled listings with includeDetails:true. Nested fallbacks kept defensively in case
+// coverage varies by city/listing. Note `item.location` on this actor is a plain string
+// (neighborhood name), so asRecord() on it correctly falls through to null instead of
+// misreading string characters as an object.
+function extractLatLon(item: Record<string, unknown>): { lat: number | null; lon: number | null } {
+  const nested = [asRecord(item.location), asRecord(item.coordinates), asRecord(item.geo)]
+  const firstDefined = (...vals: unknown[]) => vals.find(v => v != null && v !== '')
+
+  const rawLat = firstDefined(
+    item.latitude, item.lat,
+    ...nested.map(o => o?.latitude), ...nested.map(o => o?.lat)
+  )
+  const rawLon = firstDefined(
+    item.longitude, item.lon, item.lng,
+    ...nested.map(o => o?.longitude), ...nested.map(o => o?.lon), ...nested.map(o => o?.lng)
+  )
+
+  const lat = rawLat != null && !isNaN(Number(rawLat)) ? Number(rawLat) : null
+  const lon = rawLon != null && !isNaN(Number(rawLon)) ? Number(rawLon) : null
+  return { lat, lon }
 }
 
 function logRawSample(source: string, item: Record<string, unknown>): void {
@@ -459,6 +476,7 @@ function validateCraigslistItem(item: Record<string, unknown>): ScrapedListing |
   )
 
   const address = String(item.address || item.location || '')
+  const { lat, lon } = extractLatLon(item)
 
   return {
     externalId: String(postId),
@@ -480,6 +498,8 @@ function validateCraigslistItem(item: Record<string, unknown>): ScrapedListing |
     // Actor returns imageUrls (array), not images
     images: Array.isArray(item.imageUrls) ? item.imageUrls.map(String)
            : Array.isArray(item.images) ? item.images.map(String) : [],
+    lat,
+    lon,
   }
 }
 
