@@ -224,20 +224,31 @@ export async function startCraigslistScrape(
   }, buildWebhooks(webhookUrl, searchRunId, 'craigslist'))
 }
 
-export async function startTruliaScrape(
-  neighborhoods: Neighborhood,
-  webhookUrl: string,
-  searchRunId: string,
-  preferences?: { max_rent?: number | null; min_bedrooms?: number | null; max_bedrooms?: number | null; min_bathrooms?: number | null; pet_friendly?: boolean | null; in_unit_laundry?: boolean | null; air_conditioning?: boolean | null; gym?: boolean | null; parking_required?: boolean | null }
-): Promise<string> {
-  const first = neighborhoods[0]
-  // Prefer zip code for precise targeting; fall back to neighborhood then city
-  const location = first.zip_code
-    ? first.zip_code
-    : first.neighborhood
-      ? `${first.neighborhood}, ${first.city}, ${first.state.toUpperCase()}`
-      : `${first.city}, ${first.state.toUpperCase()}`
+type TruliaPreferences = {
+  max_rent?: number | null
+  min_bedrooms?: number | null
+  max_bedrooms?: number | null
+  min_bathrooms?: number | null
+  pet_friendly?: boolean | null
+  in_unit_laundry?: boolean | null
+  air_conditioning?: boolean | null
+  gym?: boolean | null
+  parking_required?: boolean | null
+}
 
+// Ordered most-specific to least: zip (if we have one) -> "{neighborhood}, {city}, {state}"
+// (if we have a neighborhood) -> "{city}, {state}". startTruliaScrape() uses tiers[0] as the
+// primary search location; tiers[1], if present, is the runtime fallback if Trulia's GraphQL
+// resolver rejects the primary tier (see startTruliaScrapeWithFallback below).
+function truliaLocationTiers(n: Neighborhood[number]): string[] {
+  const tiers: string[] = []
+  if (n.zip_code) tiers.push(n.zip_code)
+  if (n.neighborhood) tiers.push(`${n.neighborhood}, ${n.city}, ${n.state.toUpperCase()}`)
+  tiers.push(`${n.city}, ${n.state.toUpperCase()}`)
+  return tiers
+}
+
+function buildTruliaActorInput(location: string, preferences?: TruliaPreferences) {
   const pets: string[] = preferences?.pet_friendly ? ['cats', 'large_dogs'] : []
   const unitAmenities: string[] = preferences?.in_unit_laundry ? ['washerdryer'] : []
   const buildingAmenities: string[] = [
@@ -245,7 +256,7 @@ export async function startTruliaScrape(
     ...(preferences?.parking_required ? ['garage'] : []),
   ]
 
-  return withRetry('startActor', () => startActor('igolaizola/trulia-scraper', {
+  return {
     location,
     operation: 'rent',
     sortBy: 'best',
@@ -264,7 +275,67 @@ export async function startTruliaScrape(
     ...(pets.length > 0                      && { pets }),
     ...(unitAmenities.length > 0             && { unitAmenities }),
     ...(buildingAmenities.length > 0         && { buildingAmenities }),
-  }, buildWebhooks(webhookUrl, searchRunId, 'trulia')))
+  }
+}
+
+export async function startTruliaScrape(
+  neighborhoods: Neighborhood,
+  webhookUrl: string,
+  searchRunId: string,
+  preferences?: TruliaPreferences
+): Promise<{ runId: string; fallbackLocation: string | null }> {
+  const first = neighborhoods[0]
+  const tiers = truliaLocationTiers(first)
+  const location = tiers[0]
+  const fallbackLocation = tiers[1] ?? null
+
+  const runId = await withRetry('startActor', () => startActor(
+    'igolaizola/trulia-scraper',
+    buildTruliaActorInput(location, preferences),
+    buildWebhooks(webhookUrl, searchRunId, 'trulia')
+  ))
+
+  return { runId, fallbackLocation }
+}
+
+// Called only from the webhook handler when a Trulia run FAILS specifically because Trulia's
+// GraphQL resolver rejected the location string (see isTruliaLocationFailure below) — retries
+// with a DIFFERENT (broader) location string, as opposed to withRetry()'s transient-failure
+// retries above, which reuse the SAME input. Runtime-only: the run itself has already finished
+// by the time we know it failed (webhooks arrive minutes after actor.start()), so this can't
+// live inside startTruliaScrape() — it's invoked once, after the fact, from the webhook.
+export async function retryTruliaScrapeAtLocation(
+  location: string,
+  webhookUrl: string,
+  searchRunId: string,
+  preferences?: TruliaPreferences
+): Promise<string> {
+  return withRetry('startActor (location fallback retry)', () => startActor(
+    'igolaizola/trulia-scraper',
+    buildTruliaActorInput(location, preferences),
+    buildWebhooks(webhookUrl, searchRunId, 'trulia')
+  ))
+}
+
+const TRULIA_LOCATION_ERROR = 'Unable to perform a search for the specified location'
+
+export async function fetchActorRunLog(runId: string): Promise<string> {
+  const res = await fetch(`${APIFY_BASE}/actor-runs/${runId}/log?token=${token()}`)
+  if (!res.ok) throw new Error(`Failed to fetch run log for ${runId}: ${res.status}`)
+  return res.text()
+}
+
+// Distinguishes "Trulia couldn't resolve this location string" (a data-quality problem, fixable
+// by retrying with a broader location) from other FAILED causes like proxy blocks or GraphQL 500s
+// (transient infra problems, already handled by withRetry()). See docs/chunk-3-trulia-findings.md.
+export async function isTruliaLocationFailure(runId: string): Promise<boolean> {
+  try {
+    const log = await fetchActorRunLog(runId)
+    return log.includes(TRULIA_LOCATION_ERROR)
+  } catch (err) {
+    console.warn(`[TRULIA] could not fetch run log for ${runId} to classify failure: ${(err as Error).message}`)
+    return false
+  }
 }
 
 export async function fetchScrapedListingsByRunId(
@@ -505,7 +576,8 @@ function validateCraigslistItem(item: Record<string, unknown>): ScrapedListing |
 
 function validateTruliaItem(item: Record<string, unknown>): ScrapedListing | null {
   // igolaizola/trulia-scraper returns nested objects — access via typed casts
-  type Loc = { city?: string; stateCode?: string; zipCode?: string; streetAddress?: string; formattedLocation?: string; neighborhoodName?: string | null }
+  type Coords = { latitude?: number | string; longitude?: number | string }
+  type Loc = { city?: string; stateCode?: string; zipCode?: string; streetAddress?: string; formattedLocation?: string; neighborhoodName?: string | null; coordinates?: Coords }
   type Beds = { formattedValue?: string }
   type Floor = { formattedDimension?: string }
   type Meta = { typedHomeId?: string }
@@ -581,6 +653,13 @@ function validateTruliaItem(item: Record<string, unknown>): ScrapedListing | nul
   // Raw actor output uses location.neighborhoodName (verified against live dataset July 2026)
   const neighborhood = loc?.neighborhoodName || null
 
+  // Coordinates are duplicated on this actor: homeCoordinates.coordinates is the documented
+  // field, location.coordinates is a matching fallback (confirmed live, chunk 3 findings).
+  const homeCoords = (item.homeCoordinates as { coordinates?: Coords } | undefined)?.coordinates
+  const coords = homeCoords || loc?.coordinates
+  const lat = coords?.latitude != null && !isNaN(Number(coords.latitude)) ? Number(coords.latitude) : null
+  const lon = coords?.longitude != null && !isNaN(Number(coords.longitude)) ? Number(coords.longitude) : null
+
   return {
     externalId,
     source: 'trulia',
@@ -601,6 +680,8 @@ function validateTruliaItem(item: Record<string, unknown>): ScrapedListing | nul
     amenities,
     description: null,
     images,
+    lat,
+    lon,
   }
 }
 

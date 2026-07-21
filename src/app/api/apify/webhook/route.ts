@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { fetchScrapedListingsByRunId, fetchTruliaListingsByRunId } from '@/lib/apify'
+import { fetchScrapedListingsByRunId, fetchTruliaListingsByRunId, isTruliaLocationFailure, retryTruliaScrapeAtLocation } from '@/lib/apify'
 import { getAnthropic, SCORING_PROMPT, fetchListingImages } from '@/lib/anthropic'
 import { buildVotedContext, type VotedRow } from '@/lib/scoring-utils'
 
@@ -67,6 +67,47 @@ export async function POST(req: NextRequest) {
   const resolvedRunId = storedRunId || actorRunId
   console.log(`Webhook: source=${source} eventType=${eventType} resolvedRunId=${resolvedRunId} pending=${newPending} allDone=${allDone}`)
 
+  // Trulia-specific: a FAILED run may be Trulia's GraphQL resolver rejecting our location
+  // string outright, rather than a transient/proxy failure (withRetry() in apify.ts already
+  // retries those with the SAME input). Distinguish the two via the run log, and for a genuine
+  // location-resolution failure, retry once with the next-lower fallback tier (dropped when the
+  // run was started, stored on search_runs.trulia_fallback_location) instead of giving up.
+  if (source === 'trulia' && eventType === 'ACTOR.RUN.FAILED' && actorRunId) {
+    const locationFailure = await isTruliaLocationFailure(actorRunId)
+    const fallbackLocation = searchRun.trulia_fallback_location as string | null
+
+    if (locationFailure && fallbackLocation) {
+      console.warn(`[TRULIA] location-resolution failure for search_run=${searchRunId} (actorRunId=${actorRunId}) — retrying at fallback tier "${fallbackLocation}"`)
+
+      try {
+        const { data: prefRow } = await supabase.from('preferences').select('*').eq('user_id', userId).single()
+        const retryWebhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/apify/webhook?secret=${process.env.CRON_SECRET}`
+        const newRunId = await retryTruliaScrapeAtLocation(fallbackLocation, retryWebhookUrl, searchRunId, prefRow || undefined)
+
+        // Undo the decrement above — a replacement run is now in flight, so this source isn't
+        // actually done yet. Atomic RPC avoids clobbering concurrent decrements from other sources.
+        await supabase.rpc('increment_apify_runs_pending', { run_id: searchRunId })
+        await supabase
+          .from('search_runs')
+          .update({
+            apify_run_ids: { ...(searchRun.apify_run_ids as Record<string, string> | null), trulia: newRunId },
+            trulia_fallback_location: null, // exhausted — at most one retry
+          })
+          .eq('id', searchRunId)
+
+        console.log(`[TRULIA] fallback retry started: new run ${newRunId} for search_run=${searchRunId}`)
+        return NextResponse.json({ ok: true, truliaFallbackRetried: true })
+      } catch (err) {
+        console.error(`[TRULIA] fallback retry failed to start for search_run=${searchRunId}: ${(err as Error).message}`)
+        // fall through to normal failure handling below
+      }
+    } else if (locationFailure) {
+      console.warn(`[TRULIA] location-resolution failure for search_run=${searchRunId} (actorRunId=${actorRunId}) — already at broadest tier, no further fallback`)
+    } else {
+      console.warn(`[TRULIA] run FAILED for search_run=${searchRunId} (actorRunId=${actorRunId}) — not a location-resolution failure (transient/proxy/other)`)
+    }
+  }
+
   let listingsFoundThisRun = 0
   let scoredThisRun = 0
 
@@ -124,6 +165,8 @@ export async function POST(req: NextRequest) {
             images: listing.images,
             scraped_at: new Date().toISOString(),
             is_available: true,
+            lat: listing.lat ?? null,
+            lon: listing.lon ?? null,
           }, { onConflict: 'external_id,source' })
           .select()
           .single()

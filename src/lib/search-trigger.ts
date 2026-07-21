@@ -108,10 +108,12 @@ export async function triggerSearchForUser(supabase: SupabaseClient, userId: str
     startTruliaScrape(neighborhoods, webhookUrl, searchRun.id, preferences),
   ])
 
+  const truliaStarted = truliaResult.status === 'fulfilled' ? truliaResult.value : null
+
   const runIds = {
     zillow: zillowResult.status === 'fulfilled' ? zillowResult.value : null,
     craigslist: craigslistResult.status === 'fulfilled' ? craigslistResult.value : null,
-    trulia: truliaResult.status === 'fulfilled' ? truliaResult.value : null,
+    trulia: truliaStarted?.runId ?? null,
   }
 
   const successfulStarts = Object.values(runIds).filter(Boolean).length
@@ -134,12 +136,15 @@ export async function triggerSearchForUser(supabase: SupabaseClient, userId: str
     return { ok: false, status: 500, error: 'All scrapers failed to start', details: failures }
   }
 
-  // Store run IDs and set pending count to only the actors that actually started
+  // Store run IDs and set pending count to only the actors that actually started.
+  // trulia_fallback_location is the next-lower location tier the webhook can retry against
+  // if this Trulia run fails specifically on location resolution (null if already city-level).
   await supabase
     .from('search_runs')
     .update({
       apify_run_ids: runIds,
       apify_runs_pending: successfulStarts,
+      trulia_fallback_location: truliaStarted?.fallbackLocation ?? null,
     })
     .eq('id', searchRun.id)
 

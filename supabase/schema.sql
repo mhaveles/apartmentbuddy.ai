@@ -85,6 +85,8 @@ create table public.listings (
   images text[],
   raw_data jsonb,
   scraped_at timestamptz not null default now(),
+  lat double precision,
+  lon double precision,
   unique(external_id, source)
 );
 
@@ -101,6 +103,7 @@ create table public.search_runs (
   error text,
   apify_runs_pending int not null default 0,
   apify_run_ids jsonb not null default '{}',
+  trulia_fallback_location text, -- next-lower Trulia location tier to retry if the primary tier fails to resolve; null once exhausted or never applicable
   started_at timestamptz,
   completed_at timestamptz,
   created_at timestamptz not null default now()
@@ -189,6 +192,18 @@ returns public.search_runs as $$
   returning *;
 $$ language sql security definer;
 
+-- Function to atomically increment apify_runs_pending, returns updated row.
+-- Used by the Trulia location-fallback retry (webhook route): a FAILED run gets decremented
+-- immediately on arrival, then re-incremented here if a replacement run is started in its place,
+-- so a concurrent decrement from another source's webhook can't be clobbered by a naive read-then-write.
+create or replace function public.increment_apify_runs_pending(run_id uuid)
+returns public.search_runs as $$
+  update public.search_runs
+  set apify_runs_pending = apify_runs_pending + 1
+  where id = run_id
+  returning *;
+$$ language sql security definer;
+
 -- Migration: add vote column to user_listings
 -- alter table public.user_listings
 --   add column if not exists vote smallint check (vote in (-1, 1));
@@ -214,6 +229,23 @@ $$ language sql security definer;
 --
 -- alter table public.user_listings
 --   add column if not exists search_run_id uuid references public.search_runs(id) on delete set null;
+
+-- Migration: geo coordinates on listings (chunk 4) + Trulia location-fallback retry tracking
+-- Run in Supabase SQL Editor:
+-- alter table public.listings
+--   add column if not exists lat double precision,
+--   add column if not exists lon double precision;
+--
+-- alter table public.search_runs
+--   add column if not exists trulia_fallback_location text;
+--
+-- create or replace function public.increment_apify_runs_pending(run_id uuid)
+-- returns public.search_runs as $$
+--   update public.search_runs
+--   set apify_runs_pending = apify_runs_pending + 1
+--   where id = run_id
+--   returning *;
+-- $$ language sql security definer;
 
 -- Function to refund a search credit on failed runs
 create or replace function public.decrement_searches_used(user_id uuid)
